@@ -117,9 +117,9 @@ ggplot(pressure_summary_all,
 paired <- palette.colors(12, "Paired")
 
 bg_cols <- c(
-  "morning" = paired[1],
-  "afternoon" = paired[3],
-  "evening" = paired[5]
+  "morning" = paired[7],
+  "afternoon" = paired[5],
+  "evening" = paired[3]
 )
 
 time_blocks <- data.frame(
