@@ -1,4 +1,5 @@
 Day 1:
 - connecting github with R 
-- tydiing the Xylem pressure Data 
+- tyding the Xylem pressure Data 
 - plotting the xylem pressure 
+- putting the stats into a new file 
