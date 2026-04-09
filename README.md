@@ -19,3 +19,15 @@ Day 3:
 
 Day 4:
 - redoing xylem pressure: adding color of night because of 20-8am timewindow 
+- looking at dec & dem
+  - inpout varies in timewindow but also individuals that actually peed 
+  
+Day 5:
+- Starting Cas
+  - tidying up data 
+  - checking difference between male and female 
+  - DONT FORGET: time window varies to Dec & Dem
+  - no excrition only difference in body weight 
+    - same individual during the day
+  - control group 
+    - how much weight loss is needed to die? 
