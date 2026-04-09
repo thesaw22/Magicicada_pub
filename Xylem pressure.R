@@ -109,9 +109,10 @@ ggplot(pressure_summary_all,
 #> adding colorful backround to give a timewindow of morning, noon, and evening 
 #> step 1: giving a color palette for timeslot
 #> step 2: creating the time windows 
-#>  morning: 5-12
-#>  afternoon: 12-5
-#>  evening: 5-9
+#>  morning: 8-10
+#>  afternoon: 10-5
+#>  evening: 5-8
+#>  night> 8-8
 #>step 3: adding background shading to the plot 
 
 paired <- palette.colors(12, "Paired")
@@ -119,13 +120,14 @@ paired <- palette.colors(12, "Paired")
 bg_cols <- c(
   "morning" = paired[7],
   "afternoon" = paired[5],
-  "evening" = paired[3]
+  "evening" = paired[3],
+  "night" = paired[1]
 )
 
 time_blocks <- data.frame(
-  period = c("morning", "afternoon", "evening"),
-  xmin = as.POSIXct(c("05:00", "12:00", "17:00"), format = "%H:%M"),
-  xmax = as.POSIXct(c("12:00", "17:00", "21:00"), format = "%H:%M"),
+  period = c("night", "morning", "afternoon", "evening", "night"),
+  xmin = as.POSIXct(c("05:00", "07:00", "10:00", "17:00", "20:00"), format = "%H:%M"),
+  xmax = as.POSIXct(c("08:00", "10:00", "17:00", "20:00", "21:00"), format = "%H:%M"),
   ymin = -Inf,
   ymax = Inf
 )
