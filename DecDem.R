@@ -936,6 +936,699 @@ kruskal.test(input_g_hr ~ time_window, data = plot_data)
 #data:  input_g_hr by time_window
 #Kruskal-Wallis chi-squared = 12.453, df = 3, p-value = 0.005983
 
+#----------------------------------------------------------------
+##### CicTen Input Rate + Plots - WITHOUT NEG ####
+
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(lubridate)
+library(tibble)
+library(ggpubr)
+
+# 1. Final summary per cicada
+final_cicten_pos <- cicten_tidy %>%
+  mutate(
+    datetime = as.POSIXct(
+      paste(date, time),
+      format = "%d.%m.%y %H:%M"
+    )
+  ) %>%
+  group_by(number, species, sex) %>%
+  summarise(
+    lab_weight = first(weight[action == "lab"]),
+    total_pee = sum(weight[action == "pee"], na.rm = TRUE),
+    final_bodyweight = last(weight[action == "bodyweight"]),
+    
+    lab_datetime = first(datetime[action == "lab"]),
+    first_pee_datetime = first(datetime[action == "pee"]),
+    final_bodyweight_datetime = last(datetime[action == "bodyweight"]),
+    
+    .groups = "drop"
+  ) %>%
+  mutate(
+    input = (total_pee + final_bodyweight) - lab_weight,
+    
+    duration_to_pee_mins = as.numeric(
+      difftime(first_pee_datetime, lab_datetime, units = "mins")
+    ),
+    
+    duration_to_end_mins = as.numeric(
+      difftime(final_bodyweight_datetime, lab_datetime, units = "mins")
+    ),
+    
+    duration_hours = duration_to_pee_mins / 60,
+    
+    input_g_hr = case_when(
+      is.na(duration_hours) ~ NA_real_,
+      duration_hours <= 0 ~ NA_real_,
+      TRUE ~ input / duration_hours
+    ),
+    
+    # flag negative input rates
+    negative_input_rate = !is.na(input_g_hr) & input_g_hr < 0
+  )
+
+final_cicten_pos
+
+# optional: inspect which individuals have negative rates
+negative_cases <- final_cicten_pos %>%
+  filter(negative_input_rate) %>%
+  select(
+    number, species, sex,
+    lab_weight, total_pee, final_bodyweight,
+    input, duration_hours, input_g_hr
+  )
+
+negative_cases
+
+# Optional save
+write_csv(final_cicten_pos, "final_cicten_pos.csv")
 
 
+#### 2. Add time-window grouping for plotting ####
+
+# IMPORTANT:
+# for plotting, keep only non-missing and non-negative input rates
+plot_data_pos <- final_cicten_pos %>%
+  filter(!is.na(input_g_hr), input_g_hr >= 0) %>%
+  mutate(
+    lab_hour = hour(lab_datetime),
+    
+    time_window = case_when(
+      lab_hour >= 7  & lab_hour < 10 ~ "Morning",
+      lab_hour >= 10 & lab_hour < 17 ~ "Afternoon",
+      lab_hour >= 17 & lab_hour < 20 ~ "Evening",
+      TRUE ~ "Night"
+    ),
+    
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    
+    x_cat = case_when(
+      time_window == "Morning" ~ 1,
+      time_window == "Afternoon" ~ 2,
+      time_window == "Evening" ~ 3,
+      time_window == "Night" ~ 4
+    ),
+    
+    x_species = x_cat + ifelse(species == "Dec", -0.15, 0.15)
+  )
+
+plot_data_pos
+
+# optional check: how many negative values were excluded?
+final_cicten_pos %>%
+  summarise(
+    total_n = n(),
+    negative_n = sum(negative_input_rate, na.rm = TRUE),
+    plotted_n = sum(!is.na(input_g_hr) & input_g_hr >= 0, na.rm = TRUE)
+  )
+
+
+#### 3. Check species differences within each time window ####
+
+plot_data_species_pos <- plot_data_pos %>%
+  mutate(
+    species = factor(species, levels = c("Dec", "Dem")),
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    )
+  )
+
+species_tests_pos <- plot_data_species_pos %>%
+  group_by(time_window) %>%
+  summarise(
+    p_value = tryCatch(
+      wilcox.test(input_g_hr ~ species)$p.value,
+      error = function(e) NA_real_
+    ),
+    .groups = "drop"
+  )
+
+species_tests_pos
+# A tibble: 4 × 2
+#time_window p_value
+#<fct>         <dbl>
+#1 Morning       0.8  
+#2 Afternoon     0.912
+#3 Evening       0.352
+#4 Night         0.167
+
+#### Figure: species comparison within each time window ####
+
+fig_species_by_time_pos <- ggplot(
+  plot_data_species_pos,
+  aes(x = species, y = input_g_hr)
+) +
+  
+  geom_violin(
+    aes(fill = time_window),
+    alpha = 0.45,
+    color = NA,
+    trim = FALSE
+  ) +
+  
+  geom_jitter(
+    aes(color = time_window, shape = species),
+    width = 0.08,
+    size = 2.6,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    size = 3.5,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.12,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  facet_wrap(~ time_window, nrow = 2) +
+  
+  stat_compare_means(
+    comparisons = list(c("Dec", "Dem")),
+    method = "wilcox.test",
+    label = "p.signif",
+    hide.ns = FALSE
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Morning" = cols_all[8],
+      "Afternoon" = cols_all[6],
+      "Evening" = cols_all[4],
+      "Night" = cols_all[2]
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Morning" = cols_all[7],
+      "Afternoon" = cols_all[5],
+      "Evening" = cols_all[3],
+      "Night" = cols_all[1]
+    )
+  ) +
+  
+  scale_shape_manual(
+    values = c(
+      "Dec" = 16,
+      "Dem" = 17
+    )
+  ) +
+  
+  labs(
+    x = "Species",
+    y = "Input rate (g/hr)"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none",
+    shape = "none"
+  ) +
+  
+  theme_classic() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+fig_species_by_time_pos
+
+
+#### 3.1. Fully separate plots #####
+
+plot_morning_pos   <- plot_data_species_pos %>% filter(time_window == "Morning")
+plot_afternoon_pos <- plot_data_species_pos %>% filter(time_window == "Afternoon")
+plot_evening_pos   <- plot_data_species_pos %>% filter(time_window == "Evening")
+plot_night_pos     <- plot_data_species_pos %>% filter(time_window == "Night")
+
+make_plot_pos <- function(data, title_label, fill_col, line_col) {
+  ggplot(data, aes(x = species, y = input_g_hr)) +
+    
+    geom_violin(fill = fill_col, alpha = 0.45, color = NA, trim = FALSE) +
+    
+    geom_jitter(
+      aes(shape = species),
+      width = 0.08,
+      size = 2.6,
+      alpha = 0.9,
+      color = line_col
+    ) +
+    
+    stat_summary(
+      fun = mean,
+      geom = "point",
+      size = 3.5,
+      color = "black"
+    ) +
+    
+    stat_summary(
+      fun.data = mean_se,
+      geom = "errorbar",
+      width = 0.12,
+      color = "black"
+    ) +
+    
+    stat_compare_means(
+      comparisons = list(c("Dec", "Dem")),
+      method = "wilcox.test",
+      label = "p.signif"
+    ) +
+    
+    scale_shape_manual(values = c("Dec" = 16, "Dem" = 17)) +
+    
+    labs(
+      title = title_label,
+      x = "Species",
+      y = "Input rate (g/hr)"
+    ) +
+    
+    theme_classic() +
+    theme(legend.position = "none")
+}
+
+pApos <- make_plot_pos(plot_morning_pos,   "A) Morning",   cols_all[7], cols_all[8])
+pBpos <- make_plot_pos(plot_afternoon_pos, "B) Afternoon", cols_all[5], cols_all[6])
+pCpos <- make_plot_pos(plot_evening_pos,   "C) Evening",   cols_all[3], cols_all[4])
+pDpos <- make_plot_pos(plot_night_pos,     "D) Night",     cols_all[1], cols_all[2])
+
+pApos
+pBpos
+pCpos
+pDpos
+
+library(patchwork)
+(pApos | pBpos) / (pCpos | pDpos)
+
+
+#### 4. Figure 1: raw points + mean ± SE ####
+
+fig1_pos <- ggplot(plot_data_pos, aes(x = x_cat, y = input_g_hr)) +
+  
+  geom_rect(
+    data = tibble(
+      xmin = c(0.5, 1.5, 2.5, 3.5),
+      xmax = c(1.5, 2.5, 3.5, 4.5),
+      ymin = -Inf,
+      ymax = Inf,
+      time_window = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = time_window),
+    inherit.aes = FALSE,
+    alpha = 0.2
+  ) +
+  
+  geom_point(
+    aes(
+      x = x_species,
+      color = time_window,
+      shape = species
+    ),
+    size = 3,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(
+      x = x_species,
+      group = interaction(time_window, species)
+    ),
+    fun = mean,
+    geom = "point",
+    size = 4,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(
+      x = x_species,
+      group = interaction(time_window, species)
+    ),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.06,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  scale_x_continuous(
+    breaks = c(1, 2, 3, 4),
+    labels = c("Morning", "Afternoon", "Evening", "Night"),
+    expand = c(0, 0)
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Morning" = cols_all[8],
+      "Afternoon" = cols_all[6],
+      "Evening" = cols_all[4],
+      "Night" = cols_all[2]
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Morning" = cols_all[7],
+      "Afternoon" = cols_all[5],
+      "Evening" = cols_all[3],
+      "Night" = cols_all[1]
+    )
+  ) +
+  
+  scale_shape_manual(
+    values = c(
+      "Dec" = 16,
+      "Dem" = 17
+    )
+  ) +
+  
+  labs(
+    x = "Time window",
+    y = "Input rate (g/hr)",
+    shape = "Species"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none",
+    shape = guide_legend(title = "Species")
+  ) +
+  
+  theme_classic() +
+  theme(
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0, 1),
+    legend.background = element_blank()
+  )
+
+fig1_pos
+
+
+#### 4.1. Figure 1: combining Dec and Dem ####
+
+fig1_pos_pooled <- ggplot(plot_data, aes(x = x_cat, y = input_g_hr)) +
+  
+  geom_rect(
+    data = tibble(
+      xmin = c(0.5, 1.5, 2.5, 3.5),
+      xmax = c(1.5, 2.5, 3.5, 4.5),
+      ymin = -Inf,
+      ymax = Inf,
+      time_window = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = time_window),
+    inherit.aes = FALSE,
+    alpha = 0.2
+  ) +
+  
+  geom_jitter(
+    aes(color = time_window),
+    width = 0.12,
+    size = 3,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(group = time_window),
+    fun = mean,
+    geom = "point",
+    size = 4,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(group = time_window),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.08,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  scale_x_continuous(
+    breaks = c(1, 2, 3, 4),
+    labels = c("Morning", "Afternoon", "Evening", "Night"),
+    expand = c(0, 0)
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Morning" = cols_all[8],
+      "Afternoon" = cols_all[6],
+      "Evening" = cols_all[4],
+      "Night" = cols_all[2]
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Morning" = cols_all[7],
+      "Afternoon" = cols_all[5],
+      "Evening" = cols_all[3],
+      "Night" = cols_all[1]
+    )
+  ) +
+  
+  labs(
+    x = "Time window",
+    y = "Input rate (g/hr)"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none"
+  ) +
+  
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +
+  
+  theme_classic()
+
+fig1_pos_pooled
+
+
+#### 5. Figure 2: violin + raw points + mean ± SE ####
+
+fig2_pos <- ggplot(plot_data, aes(x = time_window, y = input_g_hr)) +
+  
+  geom_violin(
+    aes(fill = time_window),
+    alpha = 0.5,
+    color = NA,
+    trim = FALSE
+  ) +
+  
+  geom_point(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      color = time_window,
+      shape = species
+    ),
+    size = 2.8,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      group = interaction(time_window, species)
+    ),
+    fun = mean,
+    geom = "point",
+    size = 3.5,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      group = interaction(time_window, species)
+    ),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.05,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Morning" = cols_all[8],
+      "Afternoon" = cols_all[6],
+      "Evening" = cols_all[4],
+      "Night" = cols_all[2]
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Morning" = cols_all[7],
+      "Afternoon" = cols_all[5],
+      "Evening" = cols_all[3],
+      "Night" = cols_all[1]
+    )
+  ) +
+  
+  scale_shape_manual(
+    values = c(
+      "Dec" = 16,
+      "Dem" = 17
+    )
+  ) +
+  
+  labs(
+    x = "Time window",
+    y = "Input rate (g/hr)",
+    shape = "Species"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none",
+    shape = guide_legend(title = "Species")
+  ) +
+  
+  theme_classic() +
+  theme(
+    legend.position = c(0.05, 0.95),
+    legend.justification = c(0, 1),
+    legend.background = element_blank()
+  )
+
+fig2_pos
+
+
+#### 5.1. Figure 2: violin with combination of Dec and Dem ####
+
+fig2_pos_pooled <- ggplot(plot_data, aes(x = time_window, y = input_g_hr)) +
+  
+  geom_violin(
+    aes(fill = time_window),
+    alpha = 0.5,
+    color = NA,
+    trim = FALSE
+  ) +
+  
+  geom_jitter(
+    aes(color = time_window),
+    width = 0.12,
+    size = 2.8,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(group = time_window),
+    fun = mean,
+    geom = "point",
+    size = 3.5,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(group = time_window),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.08,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  stat_compare_means(
+    comparisons = list(
+      c("Morning", "Night"),
+      c("Evening", "Night")
+    ),
+    method = "wilcox.test",
+    label = "p.signif",
+    hide.ns = TRUE,
+    label.y = c(
+      max(plot_data$input_g_hr, na.rm = TRUE) * 1.05,
+      max(plot_data$input_g_hr, na.rm = TRUE) * 1.12
+    )
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Morning" = cols_all[8],
+      "Afternoon" = cols_all[6],
+      "Evening" = cols_all[4],
+      "Night" = cols_all[2]
+    )
+  ) +
+  
+  scale_fill_manual(
+    values = c(
+      "Morning" = cols_all[7],
+      "Afternoon" = cols_all[5],
+      "Evening" = cols_all[3],
+      "Night" = cols_all[1]
+    )
+  ) +
+  
+  labs(
+    x = "Time window",
+    y = "Input rate (g/hr)"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none"
+  ) +
+  
+  scale_y_continuous(
+    expand = expansion(mult = c(0.05, 0.12))
+  ) +
+  
+  theme_classic()
+
+fig2_pos_pooled
+
+#### Statistics: POSITIVE #####
+
+#Summary
+plot_data_pos %>%
+  summarise(
+    n = n(),
+    min_input = min(input_g_hr, na.rm = TRUE),
+    max_input = max(input_g_hr, na.rm = TRUE),
+    mean_input = mean(input_g_hr, na.rm = TRUE),
+    sd_input = sd(input_g_hr, na.rm = TRUE)
+  )
  
+#by species 
+plot_data_pos %>%
+  group_by(species) %>%
+  summarise(
+    n = n(),
+    min_input = min(input_g_hr, na.rm = TRUE),
+    max_input = max(input_g_hr, na.rm = TRUE),
+    mean_input = mean(input_g_hr, na.rm = TRUE),
+    sd_input = sd(input_g_hr, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Anova
+model <- lm(input_g_hr ~ species * time_window, data = plot_data_pos)
+anova(model)
+
+summary(model)
+
+library(emmeans)
+emmeans(model, pairwise ~ species | time_window)
+
+library(effectsize)
+eta_squared(model)
+
+kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
