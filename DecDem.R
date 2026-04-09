@@ -1,9 +1,8 @@
 library(readr)
-CicTen <- read_delim("CicTen.csv", delim = ";", 
-                     escape_double = FALSE, col_types = cols(Number = col_number(), 
-                                                             `time of first action` = col_time(format = "%H:%M")), 
-                     trim_ws = TRUE)
+CicTen <- read_delim("data/CicTen.csv", delim = ";", 
+                     escape_double = FALSE, trim_ws = TRUE)
 View(CicTen)
+
 
 # Color theme for this paper: 
 cols_all <- palette.colors(12, palette = "Paired")
@@ -14,7 +13,7 @@ barplot(rep(1, length(cols_all)),
         border = NA,
         main = "Paired palette (indexed)")
 
-##### CicTen Data Tidying Script ####
+#### CicTen Data Tidying Script ####
 
 library(readr)
 library(dplyr)
@@ -27,6 +26,8 @@ library(hms)
 remove_ids <- c(
   24,
   25,
+  30,
+  31,
   39:42,
   44,
   47, 48,
@@ -141,7 +142,9 @@ cicten_tidy %>%
 
 24 %in% cicten_tidy$number
 
-##### CicTen Input Rate + Plots ####
+write_csv(cicten_tidy, "cicten_tidy.csv")
+
+#### CicTen Input Rate + Plots ####
 
 library(dplyr)
 library(readr)
@@ -227,7 +230,7 @@ plot_data <- final_cicten %>%
 
 plot_data
 
-##### 3. Check species differences within each time window ####
+#### 3. Check species differences within each time window ####
 
 library(dplyr)
 library(ggplot2)
@@ -261,7 +264,7 @@ species_tests
 #3 Evening       0.937
 #4 Night         0.107
 
-##### Figure: species comparison within each time window ####
+#### Figure: species comparison within each time window ####
 
 fig_species_by_time <- ggplot(
   plot_data_species,
@@ -350,7 +353,7 @@ fig_species_by_time <- ggplot(
 
 fig_species_by_time
 
-##### 3.1. fully separate plots #####
+#### 3.1. fully separate plots #####
 
 plot_morning   <- plot_data_species %>% filter(time_window == "Morning")
 plot_afternoon <- plot_data_species %>% filter(time_window == "Afternoon")
@@ -782,7 +785,7 @@ fig2_pooled <- ggplot(plot_data, aes(x = time_window, y = input_g_hr)) +
 
 fig2_pooled
 
-##### Statistic tests ####
+#### Statistic tests ####
 
 #Summary
 plot_data %>%
@@ -793,11 +796,6 @@ plot_data %>%
     mean_input = mean(input_g_hr, na.rm = TRUE),
     sd_input = sd(input_g_hr, na.rm = TRUE)
   )
-
-# A tibble: 1 × 5
-#n     min_input   max_input   mean_input  sd_input
-#<int>     <dbl>     <dbl>      <dbl>       <dbl>
-#69    -0.0238       0.176     0.0250      0.0312
 
 
 # by species 
@@ -812,12 +810,6 @@ plot_data %>%
     .groups = "drop"
   )
 
-# A tibble: 2 × 6
-#species     n min_input max_input mean_input sd_input
-#<chr>   <int>     <dbl>     <dbl>      <dbl>    <dbl>
-#1 Dec        36  -0.0238      0.133     0.0212   0.0253
-#2 Dem        33  -0.00825     0.176     0.0292   0.0365
-
 # by time window 
 plot_data %>%
   group_by(time_window) %>%
@@ -830,114 +822,27 @@ plot_data %>%
     .groups = "drop"
   )
 
-# A tibble: 4 × 6
-#time_window     n min_input max_input mean_input sd_input
-#<fct>       <int>     <dbl>     <dbl>      <dbl>    <dbl>
-#1 Morning         6   0.00234    0.0267     0.0120  0.00930
-#2 Afternoon      26  -0.0238     0.0876     0.0196  0.0259 
-#3 Evening        12  -0.00224    0.0779     0.0144  0.0231 
-#4 Night          25  -0.00249    0.176      0.0389  0.0382 
-
 # Anova
 model <- lm(input_g_hr ~ species * time_window, data = plot_data)
 anova(model)
-#Analysis of Variance Table
-
-#Response: input_g_hr
-#Df   Sum Sq    Mean Sq F value  Pr(>F)  
-#species              1 0.001112 0.00111177  1.2087 0.27591  
-#time_window          3 0.008219 0.00273973  2.9785 0.03833 *
-#species:time_window  3 0.000698 0.00023272  0.2530 0.85890  
-#Residuals           61 0.056109 0.00091983                  
----
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 summary(model)
-#Call:
-#lm(formula = input_g_hr ~ species * time_window, data = plot_data)
 
-#Residuals:
-#  Min        1Q    Median        3Q       Max 
-#-0.039809 -0.016367 -0.007473  0.008080  0.127671 
-
-#Coefficients:
-#Estimate Std. Error t value Pr(>|t|)
-#(Intercept)                      1.299e-02  1.516e-02   0.856    0.395
-#speciesDem                      -2.955e-03  2.627e-02  -0.113    0.911
-#time_windowAfternoon             2.987e-03  1.751e-02   0.171    0.865
-#time_windowEvening              -7.867e-05  1.958e-02  -0.004    0.997
-#time_windowNight                 1.860e-02  1.719e-02   1.082    0.284
-#speciesDem:time_windowAfternoon  9.762e-03  2.885e-02   0.338    0.736
-#speciesDem:time_windowEvening    5.847e-03  3.157e-02   0.185    0.854
-#speciesDem:time_windowNight      1.965e-02  2.897e-02   0.678    0.500
-
-#Residual standard error: 0.03033 on 61 degrees of freedom
-#Multiple R-squared:  0.1516,	Adjusted R-squared:  0.05429 
-#F-statistic: 1.558 on 7 and 61 DF,  p-value: 0.1654
 
 library(emmeans)
 emmeans(model, pairwise ~ species | time_window)
-#$emmeans
-#time_window = Morning:
-#species emmean      SE df lower.CL upper.CL
-#Dec     0.0130 0.01520 61 -0.01734   0.0433
-#Dem     0.0100 0.02140 61 -0.03285   0.0529
 
-#time_window = Afternoon:
-#species emmean      SE df lower.CL upper.CL
-#Dec     0.0160 0.00876 61 -0.00153   0.0335
-#Dem     0.0228 0.00811 61  0.00657   0.0390
-
-#time_window = Evening:
-#species emmean      SE df lower.CL upper.CL
-#Dec     0.0129 0.01240 61 -0.01185   0.0377
-#Dem     0.0158 0.01240 61 -0.00896   0.0406
-
-#time_window = Night:
-#species emmean      SE df lower.CL upper.CL
-#Dec     0.0316 0.00811 61  0.01538   0.0478
-#Dem     0.0483 0.00914 61  0.03000   0.0666
-
-#Confidence level used: 0.95 
-
-#$contrasts
-#time_window = Morning:
-#contrast  estimate     SE df t.ratio p.value
-#Dec - Dem  0.00296 0.0263 61   0.113  0.9108
-
-#time_window = Afternoon:
-#contrast  estimate     SE df t.ratio p.value
-#Dec - Dem -0.00681 0.0119 61  -0.570  0.5704
-
-#time_window = Evening:
-#contrast  estimate     SE df t.ratio p.value
-#Dec - Dem -0.00289 0.0175 61  -0.165  0.8694
-
-#time_window = Night:
-#contrast  estimate     SE df t.ratio p.value
-#Dec - Dem -0.01669 0.0122 61  -1.366  0.1769
 
 library(effectsize)
 eta_squared(model)
 
-# Effect Size for ANOVA (Type I)
-#Parameter           | Eta2 (partial) |       95% CI
----------------------------------------------------
-#species             |           0.02 | [0.00, 1.00]
-#time_window         |           0.13 | [0.00, 1.00]
-#species:time_window |           0.01 | [0.00, 1.00]
 
-#- One-sided CIs: upper bound fixed at [1.00].
 
 kruskal.test(input_g_hr ~ time_window, data = plot_data)
 
-#Kruskal-Wallis rank sum test
-
-#data:  input_g_hr by time_window
-#Kruskal-Wallis chi-squared = 12.453, df = 3, p-value = 0.005983
 
 #----------------------------------------------------------------
-##### CicTen Input Rate + Plots - WITHOUT NEG ####
+#### CicTen Input Rate + Plots - WITHOUT NEG ####
 
 library(dplyr)
 library(readr)
@@ -1074,7 +979,7 @@ species_tests_pos
 #time_window p_value
 #<fct>         <dbl>
 #1 Morning       0.8  
-#2 Afternoon     0.912
+#2 Afternoon     0.720
 #3 Evening       0.352
 #4 Night         0.167
 
@@ -1632,3 +1537,123 @@ library(effectsize)
 eta_squared(model)
 
 kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
+
+#> tests what time windows differ 
+#> important because Kruskal only says that it does 
+#> install.packages("FSA")
+library(FSA)
+dunnTest(input_g_hr ~ time_window, data = plot_data_pos, method = "bh")
+#> Evening - Night and Morning - Night are significant 
+#> Afternoon - Night has a trend 
+#> Post hoc Dunn tests with BH correction
+
+#----------------------------------------------------------------
+#### 1. Excretion probability ####
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(emmeans)
+library(pwr)
+library(patchwork)
+
+cols_all <- palette.colors(12, palette = "Paired")
+
+time_cols <- c(
+  "Morning"   = cols_all[7],
+  "Afternoon" = cols_all[5],
+  "Evening"   = cols_all[3],
+  "Night"     = cols_all[1]
+)
+
+pee_data <- final_cicten %>%
+  mutate(
+    lab_hour = hour(lab_datetime),
+    
+    time_window = case_when(
+      lab_hour >= 7  & lab_hour < 10 ~ "Morning",
+      lab_hour >= 10 & lab_hour < 17 ~ "Afternoon",
+      lab_hour >= 17 & lab_hour < 20 ~ "Evening",
+      TRUE ~ "Night"
+    ),
+    
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    
+    peed = ifelse(!is.na(total_pee) & total_pee > 0, 1, 0)
+  )
+
+#### 1: Excretion probability #####
+
+excretion_rate <- pee_data %>%
+  group_by(time_window) %>%
+  summarise(
+    n = n(),
+    n_peed = sum(peed, na.rm = TRUE),
+    prop = n_peed / n,
+    .groups = "drop"
+  )
+
+prob_plot <- ggplot(excretion_rate, aes(x = time_window, y = prop, fill = time_window)) +
+  geom_col(width = 0.7, alpha = 0.85) +
+  geom_text(
+    aes(label = paste0(n_peed, "/", n)),
+    vjust = -0.5,
+    size = 5
+  ) +
+  scale_fill_manual(values = time_cols) +
+  coord_cartesian(ylim = c(0, 1)) +
+  labs(
+    x = "Time window",
+    y = "Excretion probability"
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "none"
+  )
+
+prob_plot
+
+#### 2: Logistic regression #####
+
+#install.packages("logistf")
+library(logistf)
+
+glm_firth <- logistf(peed ~ time_window, data = pee_data)
+summary(glm_firth)
+
+
+# overall test for time window
+anova(glm_pee, test = "Chisq")
+#> p is significant 
+#> there is an overall effect of time window on peeing probability
+
+
+# pairwise comparisons
+emmeans(glm_pee, pairwise ~ time_window, type = "response")
+
+#### 3: Distribution + sample size #####
+
+pee_data %>%
+  group_by(time_window) %>%
+  summarise(n = n(), .groups = "drop")
+
+#### 4: Approximate power #####
+
+pwr.anova.test(
+  k = 4,
+  n = 15,
+  f = 0.25,
+  sig.level = 0.05
+)
+
+pwr.anova.test(
+  k = 4,
+  f = 0.25,
+  sig.level = 0.05,
+  power = 0.8
+)
+
+
