@@ -20,9 +20,15 @@ Day 3:
 Day 4:
 - redoing xylem pressure: adding color of night because of 20-8am timewindow 
 - looking at dec & dem
-  - inpout varies in timewindow but also individuals that actually peed 
+  - inpout varies in timewindow but also individuals that actually pee
   
 Day 5:
+- creating a Xylem pressure graph with A and B to have the different time windows of Cas and D&D
+-  making a overall graph with the different weight of cas dec and dem 
+- chekcing if intake differes between dec and dem per bodyweight and not jsut per hour 
+  - this could give us the difference in sex, because Dem is quite heavier than Dec but has a similar input rate 
+  
+Day 6:
 - Starting Cas
   - tidying up data 
   - checking difference between male and female 
