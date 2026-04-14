@@ -852,6 +852,7 @@ library(tibble)
 library(ggpubr)
 
 # 1. Final summary per cicada
+
 final_cicten_pos <- cicten_tidy %>%
   mutate(
     datetime = as.POSIXct(
@@ -859,6 +860,7 @@ final_cicten_pos <- cicten_tidy %>%
       format = "%d.%m.%y %H:%M"
     )
   ) %>%
+  
   group_by(number, species, sex) %>%
   summarise(
     lab_weight = first(weight[action == "lab"]),
@@ -871,15 +873,12 @@ final_cicten_pos <- cicten_tidy %>%
     
     .groups = "drop"
   ) %>%
+  
   mutate(
     input = (total_pee + final_bodyweight) - lab_weight,
     
     duration_to_pee_mins = as.numeric(
       difftime(first_pee_datetime, lab_datetime, units = "mins")
-    ),
-    
-    duration_to_end_mins = as.numeric(
-      difftime(final_bodyweight_datetime, lab_datetime, units = "mins")
     ),
     
     duration_hours = duration_to_pee_mins / 60,
@@ -888,35 +887,26 @@ final_cicten_pos <- cicten_tidy %>%
       is.na(duration_hours) ~ NA_real_,
       duration_hours <= 0 ~ NA_real_,
       TRUE ~ input / duration_hours
-    ),
-    
-    # flag negative input rates
-    negative_input_rate = !is.na(input_g_hr) & input_g_hr < 0
+    )
+  ) %>%
+  
+  # 🔥 FILTER DIRECTLY HERE
+  filter(
+    !is.na(input_g_hr),
+    input_g_hr >= 0
   )
 
 final_cicten_pos
 
-# optional: inspect which individuals have negative rates
-negative_cases <- final_cicten_pos %>%
-  filter(negative_input_rate) %>%
-  select(
-    number, species, sex,
-    lab_weight, total_pee, final_bodyweight,
-    input, duration_hours, input_g_hr
-  )
-
-negative_cases
-
 # Optional save
 write_csv(final_cicten_pos, "final_cicten_pos.csv")
-
 
 #### 2. Add time-window grouping for plotting ####
 
 # IMPORTANT:
 # for plotting, keep only non-missing and non-negative input rates
+
 plot_data_pos <- final_cicten_pos %>%
-  filter(!is.na(input_g_hr), input_g_hr >= 0) %>%
   mutate(
     lab_hour = hour(lab_datetime),
     
@@ -943,15 +933,6 @@ plot_data_pos <- final_cicten_pos %>%
   )
 
 plot_data_pos
-
-# optional check: how many negative values were excluded?
-final_cicten_pos %>%
-  summarise(
-    total_n = n(),
-    negative_n = sum(negative_input_rate, na.rm = TRUE),
-    plotted_n = sum(!is.na(input_g_hr) & input_g_hr >= 0, na.rm = TRUE)
-  )
-
 
 #### 3. Check species differences within each time window ####
 
@@ -1657,3 +1638,71 @@ pwr.anova.test(
 )
 
 
+
+#----------------------------------------------------------------
+#### 1: comparing weight and g/hr
+
+input_bw_data <- final_cicten_pos %>%
+  select(number, species, sex, input_g_hr, lab_weight) %>%
+  filter(!is.na(input_g_hr), !is.na(lab_weight))
+
+input_bw_data <- input_bw_data %>%
+  mutate(input_mass_specific = input_g_hr / lab_weight)
+
+wilcox.test(input_mass_specific ~ species, data = input_bw_data)
+
+#Wilcoxon rank sum exact test
+
+#data:  input_mass_specific by species
+#W = 489, p-value = 0.3664
+#alternative hypothesis: true location shift is not equal to 0
+
+model_bw <- lm(input_g_hr ~ lab_weight * species, data = input_bw_data)
+summary(model_bw)
+
+#Residuals:
+#  Min        1Q    Median        3Q       Max 
+#-0.031553 -0.017614 -0.006477  0.007912  0.144443 
+
+#Coefficients:
+# Estimate Std. Error t value Pr(>|t|)
+#(Intercept)            0.03140    0.01914   1.641    0.107
+#lab_weight            -0.01330    0.03311  -0.402    0.690 # Input does not scale with size in your dataset.
+#speciesDem            -0.00549    0.02677  -0.205    0.838 # No baseline difference between species.
+#lab_weight:speciesDem  0.02308    0.03897   0.592    0.556 # No difference in slope between species.
+
+#Residual standard error: 0.03044 on 55 degrees of freedom
+#Multiple R-squared:  0.03619,	Adjusted R-squared:  -0.01638 
+#F-statistic: 0.6884 on 3 and 55 DF,  p-value: 0.563
+
+cols_all <- palette.colors(12, palette = "Paired")
+
+ggplot(input_bw_data, aes(x = lab_weight, y = input_g_hr, color = species)) +
+  
+  geom_point(
+    size = 3,
+    alpha = 0.85
+  ) +
+  
+  geom_smooth(
+    method = "lm",
+    se = TRUE
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Dec" = cols_all[9],
+      "Dem" = cols_all[12]
+    )
+  ) +
+  
+  labs(
+    x = "Bodyweight (g)",
+    y = "Input (g/hr)",
+    color = "Species"
+  ) +
+  
+  theme_classic()
+
+# Despite differences in body size, 
+#cicadas show no scaling of intake with mass and no species-specific intake strategy.
