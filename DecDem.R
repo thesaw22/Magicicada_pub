@@ -1706,3 +1706,169 @@ ggplot(input_bw_data, aes(x = lab_weight, y = input_g_hr, color = species)) +
 
 # Despite differences in body size, 
 #cicadas show no scaling of intake with mass and no species-specific intake strategy.
+#### sex difference ####
+
+# additive model 
+model_sex <- lm(input_g_hr ~ lab_weight * species + sex, data = input_bw_data)
+summary(model_sex)
+
+#Call:
+#  lm(formula = input_g_hr ~ lab_weight * species + sex, data = input_bw_data)
+
+#Residuals:
+#  Min        1Q    Median        3Q       Max 
+#-0.029809 -0.016023 -0.008232  0.006636  0.147525 
+
+#Coefficients:
+#  Estimate Std. Error t value Pr(>|t|)  
+#(Intercept)            0.07776    0.03828   2.031   0.0472 *
+#lab_weight            -0.07917    0.05753  -1.376   0.1745  
+#speciesDem            -0.01350    0.02716  -0.497   0.6210  
+#sexmale               -0.02303    0.01652  -1.394   0.1689  
+#lab_weight:speciesDem  0.05684    0.04560   1.247   0.2179  
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 0.03018 on 54 degrees of freedom
+#Multiple R-squared:  0.06968,	Adjusted R-squared:  0.0007694 
+#F-statistic: 1.011 on 4 and 54 DF,  p-value: 0.4099
+
+#full interaction
+model_full <- lm(input_g_hr ~ lab_weight * species * sex, data = input_bw_data)
+summary(model_full)
+
+#Call:
+#  lm(formula = input_g_hr ~ lab_weight * species * sex, data = input_bw_data)
+
+#Residuals:
+#  Min        1Q    Median        3Q       Max 
+#-0.040347 -0.015268 -0.005519  0.008978  0.139948 
+
+#Coefficients:
+#  Estimate Std. Error t value Pr(>|t|)  
+#(Intercept)                    0.14762    0.07034   2.099   0.0408 *
+#lab_weight                    -0.17949    0.10252  -1.751   0.0860 .
+#speciesDem                    -0.11014    0.08073  -1.364   0.1784  
+#sexmale                       -0.10664    0.09601  -1.111   0.2719  
+#lab_weight:speciesDem          0.18019    0.10860   1.659   0.1032  
+#lab_weight:sexmale             0.13139    0.19802   0.663   0.5100  
+#speciesDem:sexmale             0.20584    0.15261   1.349   0.1834  
+#lab_weight:speciesDem:sexmale -0.30778    0.27218  -1.131   0.2634  
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 0.03038 on 51 degrees of freedom
+#Multiple R-squared:   0.11,	Adjusted R-squared:  -0.01218 
+#F-statistic: 0.9003 on 7 and 51 DF,  p-value: 0.5136
+
+# plot
+cols_all <- palette.colors(12, palette = "Paired")
+
+ggplot(input_bw_data, 
+       aes(x = lab_weight, y = input_g_hr, 
+           color = species, shape = sex)) +
+  
+  geom_point(
+    size = 3,
+    alpha = 0.85
+  ) +
+  
+  geom_smooth(
+    method = "lm",
+    se = FALSE
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "Dec" = cols_all[9],
+      "Dem" = cols_all[12]
+    )
+  ) +
+  
+  labs(
+    x = "Bodyweight (g)",
+    y = "Input (g/hr)",
+    color = "Species",
+    shape = "Sex"
+  ) +
+  
+  theme_classic()
+
+# comparing within sex
+input_bw_data %>%
+  group_by(sex) %>%
+  summarise(
+    p_value = wilcox.test(input_g_hr ~ species)$p.value
+  )
+#sex    p_value
+#<chr>    <dbl>
+#1 female  0.0192 #females differ in dec & dem 
+#2 male    0.403 
+
+#Species differences in input rate are sex-specific, occurring in females but not in males.
+#> While no overall effect of species or bodyweight on input rate was detected (linear models, p > 0.4)
+#> , analyses within sex revealed a significant species difference in females (Wilcoxon test, p = 0.019)
+#> , but not in males (p = 0.403), indicating a sex-specific pattern.
+
+ggplot(input_bw_data, 
+       aes(x = species, y = input_g_hr, color = species)) +
+  
+  geom_jitter(width = 0.1, alpha = 0.8) +
+  
+  facet_wrap(~sex) +
+  
+  scale_color_manual(
+    values = c("Dec" = cols_all[9],
+               "Dem" = cols_all[12]),
+    guide = "none"   #
+  ) +
+  
+  labs(
+    x = "Species",          
+    y = "Input (g/hr)"
+  ) +
+  
+  theme_classic()
+
+lm_female <- lm(input_g_hr ~ lab_weight * species,
+                data = filter(input_bw_data, sex == "female"))
+
+summary(lm_female)
+
+#Call:
+#  lm(formula = input_g_hr ~ lab_weight * species, data = filter(input_bw_data, sex == "female"))
+
+#Residuals:
+#  Min        1Q    Median        3Q       Max 
+#-0.031791 -0.015241 -0.005519  0.009121  0.098896 
+
+#Coefficients:
+#  Estimate Std. Error t value Pr(>|t|)  
+#(Intercept)            0.14762    0.06008   2.457   0.0202 *
+# lab_weight            -0.17949    0.08757  -2.050   0.0495 *
+# speciesDem            -0.11014    0.06896  -1.597   0.1211  
+# lab_weight:speciesDem  0.18019    0.09277   1.942   0.0619 .
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 0.02595 on 29 degrees of freedom
+#Multiple R-squared:  0.1779,	Adjusted R-squared:  0.09287 
+#F-statistic: 2.092 on 3 and 29 DF,  p-value: 0.123
+
+#>In females, larger individuals have LOWER input rates (g/hr)
+#>The relationship between bodyweight and input differs between species
+#>Dec negative slope, dem has flat slope 
+
+ggplot(filter(input_bw_data, sex == "female"),
+       aes(x = lab_weight, y = input_g_hr, color = species)) +
+  
+  geom_point(size = 3, alpha = 0.85) +
+  
+  geom_smooth(method = "lm", se = FALSE) +
+  
+  scale_color_manual(
+    values = c("Dec" = cols_all[9],
+               "Dem" = cols_all[12])
+  ) +
+  
+  theme_classic()
