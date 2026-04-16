@@ -786,8 +786,10 @@ fig2_pooled <- ggplot(plot_data, aes(x = time_window, y = input_g_hr)) +
 fig2_pooled
 
 #### Statistic tests ####
+library(dplyr)
 
-#Summary
+## 1. Overall summary
+
 plot_data %>%
   summarise(
     n = n(),
@@ -797,8 +799,14 @@ plot_data %>%
     sd_input = sd(input_g_hr, na.rm = TRUE)
   )
 
+# Interpretation:
+# Overall mean input ≈ 0.024 g/hr with relatively high variation (sd ≈ 0.0306)
+# → Variation is larger than the mean → substantial individual variability
+# → Presence of negative values indicates some individuals had net loss
 
-# by species 
+
+## 2. By species (Dec vs Dem)
+
 plot_data %>%
   group_by(species) %>%
   summarise(
@@ -810,7 +818,17 @@ plot_data %>%
     .groups = "drop"
   )
 
-# by time window 
+# Interpretation:
+# Dec: mean ≈ 0.021 g/hr
+# Dem: mean ≈ 0.028 g/hr
+#
+# → Dem tends to have slightly higher input rates
+# → However, SD is also larger in Dem → more variability
+# → Difference is small relative to variability → suggests weak species effect
+
+
+## 3. By time window
+
 plot_data %>%
   group_by(time_window) %>%
   summarise(
@@ -822,23 +840,103 @@ plot_data %>%
     .groups = "drop"
   )
 
-# Anova
+# Interpretation:
+# Morning   ≈ 0.012 g/hr (lowest)
+# Afternoon ≈ 0.017 g/hr
+# Evening   ≈ 0.014 g/hr
+# Night     ≈ 0.039 g/hr (highest)
+#
+# → Clear temporal pattern: input peaks at night
+# → Night values are roughly 2–3x higher than other periods
+# → Suggests strong diel feeding pattern
+
+
+## 4. Linear model (species * time)
+
 model <- lm(input_g_hr ~ species * time_window, data = plot_data)
 anova(model)
 
+# Interpretation (ANOVA):
+# species: p = 0.34 → NOT significant
+# → No overall difference between Dec and Dem
+
+# time_window: p = 0.025 → SIGNIFICANT
+# → Input rate changes across time of day
+
+# interaction: p = 0.81 → NOT significant
+# → Time pattern is similar in both species
+# → No evidence that species behave differently over time
+
+
+## 5. Model coefficients
+
 summary(model)
 
+# Interpretation:
+# No individual coefficients are significant
+# → This is common when:
+#    - overall factor is significant (time_window)
+#    - but pairwise contrasts are weak / variable
+#
+# Night shows a positive trend (higher input),
+# but not strong enough alone due to variability
+
+
+## 6. Post-hoc comparisons (species within time)
 
 library(emmeans)
+
 emmeans(model, pairwise ~ species | time_window)
 
+# Interpretation:
+# For ALL time windows:
+# → No significant differences between Dec and Dem
+#
+# Even at Night:
+# → Dem slightly higher than Dec
+# → But p = 0.166 → not statistically significant
+#
+# Conclusion:
+# → Species differences are small and inconsistent
+
+
+## 7. Effect sizes
 
 library(effectsize)
 eta_squared(model)
 
+# Interpretation:
+# species ≈ 0.013 → very small effect
+# time_window ≈ 0.14 → moderate effect
+# interaction ≈ 0.014 → negligible
+#
+# → Time of day explains much more variation than species
 
+
+## 8. Non-parametric confirmation
 
 kruskal.test(input_g_hr ~ time_window, data = plot_data)
+
+# Interpretation:
+# p = 0.0045 → strongly significant
+# → Confirms time effect WITHOUT assuming normality
+# → Supports robustness of the result
+
+
+## 9. Final biological interpretation
+
+# 1. No meaningful difference between species (Dec vs Dem)
+#    → Input rates are broadly similar
+
+# 2. Strong effect of time of day
+#    → Input is lowest in morning and peaks at night
+
+# 3. No interaction
+#    → Both species follow the SAME temporal pattern
+
+# Clean takeaway:
+# → Feeding/input rate is driven by time (diel rhythm),
+#   not by species identity
 
 
 #----------------------------------------------------------------
@@ -1483,17 +1581,11 @@ fig2_pos_pooled
 
 #### Statistics: POSITIVE #####
 
-#Summary
-plot_data_pos %>%
-  summarise(
-    n = n(),
-    min_input = min(input_g_hr, na.rm = TRUE),
-    max_input = max(input_g_hr, na.rm = TRUE),
-    mean_input = mean(input_g_hr, na.rm = TRUE),
-    sd_input = sd(input_g_hr, na.rm = TRUE)
-  )
- 
-#by species 
+library(dplyr)
+
+## 1. Summary by species
+
+
 plot_data_pos %>%
   group_by(species) %>%
   summarise(
@@ -1505,28 +1597,193 @@ plot_data_pos %>%
     .groups = "drop"
   )
 
-# Anova
+# Interpretation:
+# Dec mean input ≈ 0.024 g/hr
+# Dem mean input ≈ 0.034 g/hr
+#
+# → Dem still shows a somewhat higher mean input rate than Dec
+# → But variability is also high, especially in Dem
+# → So the numerical difference is not necessarily a statistically reliable one
+
+
+## 2. Linear model: species * time_window
+
 model <- lm(input_g_hr ~ species * time_window, data = plot_data_pos)
 anova(model)
 
+# Interpretation of ANOVA:
+# species: p = 0.188
+# → No significant overall difference between Dec and Dem
+#
+# time_window: p = 0.075
+# → Marginal / trend-level effect of time, but not conventionally significant at alpha = 0.05
+#
+# species:time_window: p = 0.921
+# → No interaction
+# → The time pattern does not differ between species
+
+
+## 3. Model summary
+
 summary(model)
 
+# Interpretation:
+# None of the individual coefficients are significant
+# → This means no single contrast stands out strongly against the reference category
+# → This is consistent with the ANOVA:
+#    - weak species effect
+#    - only a trend for time
+#
+# The Night coefficient is positive
+# → suggests input tends to be higher at night,
+#   but there is still too much variability for strong support in this linear model
+
+
+## 4. Estimated marginal means:
+#    compare species within each time window
+
 library(emmeans)
+
 emmeans(model, pairwise ~ species | time_window)
+
+# Interpretation:
+# Morning:    Dec vs Dem p = 0.909
+# Afternoon:  Dec vs Dem p = 0.699
+# Evening:    Dec vs Dem p = 0.546
+# Night:      Dec vs Dem p = 0.250
+#
+# → No significant species differences in any time window
+# → Dem is numerically higher in several windows, especially Night,
+#   but not significantly so
+
+
+## 5. Effect sizes
+
 
 library(effectsize)
 eta_squared(model)
 
+# Interpretation:
+# species ≈ 0.029  -> small effect
+# time_window ≈ 0.121 -> moderate effect
+# interaction ≈ 0.008 -> negligible effect
+#
+# → Time explains more variation than species
+# → Species contributes little to variation in positive input rates
+
+
+## 6. Non-parametric test across time windows
+
 kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
 
-#> tests what time windows differ 
-#> important because Kruskal only says that it does 
-#> install.packages("FSA")
+# Interpretation:
+# p = 0.0058
+# → Strong evidence that input differs among time windows
+# → This is more convincing than the linear model result
+# → Likely because the data are not well-behaved for standard ANOVA assumptions
+#
+# Important:
+# Kruskal-Wallis only tells us that at least one time window differs.
+# It does NOT tell us which time windows differ from each other.
+
+
+## 7. Dunn post-hoc test
+
+# FSA::dunnTest() can fail when the data object is a tibble
+# or when factor handling is not clean.
+# So we create a plain data.frame and make sure time_window is a factor.
+
 library(FSA)
-dunnTest(input_g_hr ~ time_window, data = plot_data_pos, method = "bh")
-#> Evening - Night and Morning - Night are significant 
-#> Afternoon - Night has a trend 
-#> Post hoc Dunn tests with BH correction
+
+dunn_data <- plot_data_pos %>%
+  select(input_g_hr, time_window) %>%
+  filter(!is.na(input_g_hr), !is.na(time_window)) %>%
+  mutate(time_window = factor(time_window)) %>%
+  as.data.frame()
+
+FSA::dunnTest(input_g_hr ~ time_window, data = dunn_data, method = "bh")
+
+#_> still error
+# Interpretation:
+# This post-hoc test will tell you WHICH time windows differ.
+# Use these pairwise adjusted p-values to identify where the significant differences lie.
+#
+# Likely expectation from your summaries:
+# → Night will differ from Morning and probably from Evening
+# → Afternoon may be intermediate
+
+
+## 8. Alternative if FSA still errors
+
+# A very robust alternative is rstatix::dunn_test()
+
+install.packages("rstatix")
+library(rstatix)
+
+plot_data_pos %>%
+  filter(!is.na(input_g_hr), !is.na(time_window)) %>%
+  dunn_test(input_g_hr ~ time_window, p.adjust.method = "BH")
+
+# Pairwise comparisons between time windows (BH-adjusted)
+
+# Morning vs Afternoon: p.adj = 0.258
+# → Not significant
+# → Input rates are similar between these periods
+
+# Morning vs Evening: p.adj = 0.807
+# → Not significant
+# → No difference between early and mid-day input
+
+# Morning vs Night: p.adj = 0.0248 *
+# → Significant
+# → Input at Night is higher than in the Morning
+
+# Afternoon vs Evening: p.adj = 0.258
+# → Not significant
+# → These two intermediate periods are similar
+
+# Afternoon vs Night: p.adj = 0.105
+# → Not significant (trend only)
+# → Suggests Night may be higher, but evidence is weak
+
+# Evening vs Night: p.adj = 0.0248 *
+# → Significant
+# → Input at Night is higher than in the Evening
+
+
+##  Final interpretation
+
+# 1. Strongest pattern:
+# → Night vs (Morning + Evening) is significantly different
+
+# 2. Intermediate periods:
+# → Afternoon and Evening are not clearly different from each other
+# → Afternoon vs Night shows only a weak trend
+
+# 3. Overall structure:
+# Morning   → lowest input
+# Afternoon → intermediate
+# Evening   → intermediate
+# Night     → highest input
+
+
+## Biological conclusion
+
+# → Input rate follows a diel pattern:
+#    - Low in the morning
+#    - Gradually increases
+#    - Peaks at night
+
+# → The significant contrasts (Night vs Morning, Night vs Evening)
+#   identify Night as the key period driving the overall effect
+
+# → Combined with previous results:
+#    - Species (Dec vs Dem): NOT important
+#    - Time of day: main driver of input variation
+
+# Clean takeaway:
+# → Feeding/input is primarily time-dependent, with a clear nocturnal peak
+
 
 #----------------------------------------------------------------
 #### 1. Excretion probability ####
@@ -1566,7 +1823,6 @@ pee_data <- final_cicten %>%
     peed = ifelse(!is.na(total_pee) & total_pee > 0, 1, 0)
   )
 
-#### 1: Excretion probability #####
 
 excretion_rate <- pee_data %>%
   group_by(time_window) %>%
@@ -1599,21 +1855,154 @@ prob_plot
 
 #### 2: Logistic regression #####
 
-#install.packages("logistf")
 library(logistf)
+
+## 1. Firth logistic regression
 
 glm_firth <- logistf(peed ~ time_window, data = pee_data)
 summary(glm_firth)
 
+# Interpretation:
+# This model tests whether the probability of peeing changes across time windows.
+# Firth logistic regression is appropriate here because you likely have small sample sizes
+# and possible separation issues (for example, Morning appears to have a probability of 1.0).
 
-# overall test for time window
+# Reference level:
+# The intercept corresponds to the reference category, which is Morning
+# (unless you changed the factor order).
+
+# Intercept:
+# coef = 2.565, p = 0.0135
+# → In the Morning, the log-odds of peeing are significantly greater than zero
+# → This corresponds to a very high peeing probability in the Morning
+
+# Afternoon:
+# coef = -2.242, p = 0.0590
+# → Compared with Morning, peeing probability tends to be lower in the Afternoon
+# → This is a trend, but not conventionally significant at p < 0.05
+
+# Evening:
+# coef = -2.565, p = 0.0387
+# → Compared with Morning, peeing probability is significantly lower in the Evening
+
+# Night:
+# coef = -1.202, p = 0.374
+# → Compared with Morning, Night is not significantly different
+
+# Important:
+# These coefficients compare each time window directly against Morning only.
+# They do NOT test all pairwise differences between all time windows.
+
+
+## 2. Overall model test
+
+# Likelihood ratio test from logistf:
+# LR test = 7.27 on 3 df, p = 0.0637
+
+# Interpretation:
+# The overall effect of time_window in the Firth model is borderline / trend-level
+# → suggests some time dependence, but evidence is moderate rather than strong
+
+# Wald test from logistf:
+# Wald test = 11.83 on 3 df, p = 0.0080
+
+# Interpretation:
+# The Wald test suggests a significant overall effect of time_window
+# → however, for small or sparse datasets, the likelihood ratio test is usually preferred
+# → therefore, I would interpret the overall Firth result cautiously:
+#    there is suggestive evidence that peeing probability changes with time
+
+
+
+## 3. Standard logistic regression ANOVA
+
 anova(glm_pee, test = "Chisq")
-#> p is significant 
-#> there is an overall effect of time window on peeing probability
+
+# Interpretation:
+# Analysis of deviance gives p = 0.0247
+# → In the standard binomial model, time_window significantly affects peeing probability
+#
+# Together with the Firth model:
+# → both analyses point in the same direction:
+#    peeing probability likely varies across time windows
+# → but the exact strength of evidence depends on the method used
 
 
-# pairwise comparisons
+## 4. Pairwise comparisons using emmeans
+
+
 emmeans(glm_pee, pairwise ~ time_window, type = "response")
+
+# Estimated probabilities:
+# Morning   = 1.000
+# Afternoon = 0.583
+# Evening   = 0.500
+# Night     = 0.808
+
+# Interpretation:
+# Morning has the highest estimated peeing probability
+# Evening has the lowest estimated peeing probability
+# Night is also high
+# Afternoon is intermediate
+
+# Biological pattern:
+# Morning   → very high peeing probability
+# Afternoon → lower
+# Evening   → lowest
+# Night     → rises again
+
+
+## 5. Pairwise contrasts
+
+# Morning / Afternoon: p = 1.000
+# Morning / Evening:   p = 1.000
+# Morning / Night:     p = 1.000
+# Afternoon / Evening: p = 0.965
+# Afternoon / Night:   p = 0.325
+# Evening / Night:     p = 0.235
+
+# Interpretation:
+# None of the pairwise comparisons are significant after Tukey adjustment.
+#
+# This can happen even when the overall test is significant or near significant:
+# → the overall model detects a general time effect
+# → but individual pairwise contrasts may lack power,
+#   especially with small sample sizes and unequal probabilities
+
+
+## 6. Why Morning looks strange
+
+# Morning probability = 1.000 with extremely small SE
+# → This suggests complete or near-complete separation:
+#    all or almost all Morning individuals peed
+#
+# Because of this:
+# → odds ratios involving Morning become extremely large
+# → pairwise tests become unstable and hard to interpret
+# → this is exactly why the Firth model is useful here
+
+
+## 7. Final interpretation
+
+# 1. Overall, peeing probability appears to vary across time windows
+
+# 2. The strongest evidence is that:
+#    - Evening is lower than Morning
+#    - Afternoon may also be lower than Morning
+#    - Night is not clearly different from Morning
+
+# 3. However, no pairwise comparisons are significant after multiple-testing correction
+
+# 4. Therefore, the safest conclusion is:
+#    → there is evidence for an overall time-of-day effect on peeing probability,
+#      but the exact pairwise differences between time windows remain uncertain
+
+# Clean takeaway:
+# → Peeing probability is highest in the Morning,
+#   declines in the Afternoon and Evening,
+#   and increases again at Night
+# → The overall time pattern is supported,
+#   but pairwise post-hoc contrasts are weak due to limited power and separation
 
 #### 3: Distribution + sample size #####
 
@@ -1640,7 +2029,11 @@ pwr.anova.test(
 
 
 #----------------------------------------------------------------
-#### 1: comparing weight and g/hr
+#### 1: comparing weight and g/hr ####
+
+library(dplyr)
+
+## 1. Prepare dataset
 
 input_bw_data <- final_cicten_pos %>%
   select(number, species, sex, input_g_hr, lab_weight) %>%
@@ -1649,31 +2042,86 @@ input_bw_data <- final_cicten_pos %>%
 input_bw_data <- input_bw_data %>%
   mutate(input_mass_specific = input_g_hr / lab_weight)
 
+# input_mass_specific standardizes input by body size
+# → allows testing whether species differ independent of size
+
+
+## 2. Species difference (mass-specific input)
+
 wilcox.test(input_mass_specific ~ species, data = input_bw_data)
 
-#Wilcoxon rank sum exact test
+# Interpretation:
+# p = 0.366
+# → No significant difference between species (Dec vs Dem)
+# → After correcting for body size, both species have similar input rates
+#
+# Biological meaning:
+# → Any raw differences in input are not due to species-specific physiology,
+#   but rather reflect similar size-normalized feeding rates
 
-#data:  input_mass_specific by species
-#W = 489, p-value = 0.3664
-#alternative hypothesis: true location shift is not equal to 0
+
+## 3. Linear model: input ~ body size * species
 
 model_bw <- lm(input_g_hr ~ lab_weight * species, data = input_bw_data)
 summary(model_bw)
 
-#Residuals:
-#  Min        1Q    Median        3Q       Max 
-#-0.031553 -0.017614 -0.006477  0.007912  0.144443 
+# Intercept:
+# Estimate = 0.0314, p = 0.107
+# → Baseline input (Dec at lab_weight = 0) is not significant
+# → Not biologically meaningful (weight = 0 is outside real range)
 
-#Coefficients:
-# Estimate Std. Error t value Pr(>|t|)
-#(Intercept)            0.03140    0.01914   1.641    0.107
-#lab_weight            -0.01330    0.03311  -0.402    0.690 # Input does not scale with size in your dataset.
-#speciesDem            -0.00549    0.02677  -0.205    0.838 # No baseline difference between species.
-#lab_weight:speciesDem  0.02308    0.03897   0.592    0.556 # No difference in slope between species.
+# lab_weight:
+# Estimate = -0.0133, p = 0.690
+# → No relationship between body size and input rate
+# → Larger individuals do NOT show higher or lower input
+#
+# Key conclusion:
+# → Input does NOT scale with body size in this dataset
 
-#Residual standard error: 0.03044 on 55 degrees of freedom
-#Multiple R-squared:  0.03619,	Adjusted R-squared:  -0.01638 
-#F-statistic: 0.6884 on 3 and 55 DF,  p-value: 0.563
+# species (Dem vs Dec):
+# Estimate = -0.00549, p = 0.838
+# → No difference in baseline input between species
+#
+# → Confirms Wilcoxon test result:
+#    species do not differ in input rate
+
+# interaction (lab_weight × species):
+# Estimate = 0.0231, p = 0.556
+# → No difference in scaling between species
+# → Both species show the same (non-existent) relationship with body size
+
+
+## 5. Model fit
+
+# R² = 0.036
+# Adjusted R² = -0.016
+#
+# → Model explains essentially none of the variation in input
+# → Predictors (size + species) have very low explanatory power
+
+# F-statistic p = 0.563
+# → Overall model is not significant
+# → Cannot reject null hypothesis that all coefficients = 0
+
+
+## 6. Final biological interpretation
+
+# 1. No species effect:
+#    → Dec and Dem have similar input rates
+
+# 2. No size effect:
+#    → Input does not scale with body weight
+
+# 3. No interaction:
+#    → Species do not differ in how input relates to size
+
+# 4. Low explanatory power:
+#    → Variation in input is driven by other factors (e.g., time of day)
+
+# Clean takeaway:
+# → Input rate is independent of both species identity and body size
+# → This reinforces earlier results showing that time (not size or species)
+#   is the primary driver of variation in input
 
 cols_all <- palette.colors(12, palette = "Paired")
 
@@ -1782,6 +2230,13 @@ ggplot(input_bw_data,
     values = c(
       "Dec" = cols_all[9],
       "Dem" = cols_all[12]
+    )
+  ) +
+  
+  scale_shape_manual(
+    values = c(
+      "female" = 15,  # square
+      "male"   = 7    # square with cross
     )
   ) +
   
