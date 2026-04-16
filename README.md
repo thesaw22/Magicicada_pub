@@ -37,3 +37,6 @@ Day 6:
     - same individual during the day
   - control group 
     - how much weight loss is needed to die? 
+    
+Day 7:
+Putting evreything together

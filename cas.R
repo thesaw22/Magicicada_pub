@@ -366,7 +366,8 @@ library(lme4)
 library(lmerTest)
 library(emmeans)
 
-### 1. Prepare analysis dataset
+_____________________________________________________________________
+#### 1. Prepare analysis dataset ####
 
 # Create time variable (in hours) and define biologically
 # meaningful time windows (based on your sampling times)
@@ -401,7 +402,7 @@ analysis_data %>%
   count(time_window, sex)
 
 
-### 2. Visualization: bodyweight across time and sex
+#### 2. Visualization: bodyweight across time and sex ####
 
 # Shows distribution (boxplot) + individual data points
 
@@ -452,18 +453,61 @@ ggplot(analysis_data, aes(x = time_window, y = weight)) +
   )
 
 
-### 3. MODEL: Does bodyweight differ across time?
-
+#### 3. MODEL: Does bodyweight differ across time? ####
 # Tests:
 # "Is bodyweight different at different times of day?"
 # Random effect (number) accounts for repeated measurements
 
+#remove.packages("lme4")
+#install.packages("Matrix")
+#install.packages("lme4", type = "source")
+
+library(Matrix)
+library(lmerTest)
+library(lme4)
+
 model_time <- lmer(weight ~ time_window + (1 | number), data = analysis_data)
 
-summary(model_time)
+# fixed effects
+fixef(model_time)
+
+# fitted values / residuals if needed
+head(fitted(model_time))
+head(resid(model_time))
+
 anova(model_time)
-# RESULT:
-# Strong effect of time_window → bodyweight changes over the day
+
+# Mixed model: weight ~ time_window + (1 | number)
+
+# (Intercept)       = 0.6107
+# time_window11:00  = 0.0792
+# time_window17:30  = 0.0433
+# time_window20:30  = 0.0621
+
+# Interpretation:
+# Weight changes significantly across time windows.
+# The lowest estimated weight is at 08:00.
+# Weight is highest at 11:00.
+# Weight then drops somewhat at 17:30,
+# and rises again slightly by 20:30.
+#
+# This suggests a clear within-day fluctuation in body weight.
+
+# ANOVA result:
+# time_window: F = 25.14, p = 4e-10
+
+# Interpretation:
+# → VERY strong effect of time_window on weight
+# → Weight significantly changes across time points
+
+# Because (1 | number) is included:
+# → This accounts for repeated measurements per individual
+# → So this result reflects WITHIN-individual changes over time
+
+# Biological meaning:
+# → Individuals systematically gain or lose weight across the day
+# → This is not due to differences between individuals,
+#   but due to temporal dynamics within the same individual
 
 
 # pairwise comparisons (which times differ?)
@@ -477,7 +521,7 @@ emm_time
 # → peak at late morning, smaller peak at night
 
 
-### 4. MODEL: Are males and females different overall?
+#### 4. MODEL: Are males and females different overall? ####
 
 # Tests:
 # "Are females and males different in bodyweight overall?"
@@ -497,7 +541,7 @@ emmeans(model_sex, pairwise ~ sex)
 # → females are significantly heavier
 
 
-### 5. MODEL: Do males and females differ in pattern over time?
+#### 5. MODEL: Do males and females differ in pattern over time? ####
 
 # Tests:
 # "Does the change across time differ between sexes?"
@@ -527,7 +571,7 @@ emm_sex_time
 # females > males at ALL times
 
 
-### 6. MODEL: When does bodyweight actually increase?
+#### 6. MODEL: When does bodyweight actually increase? ####
 
 # Instead of absolute weight, calculate change between measurements
 
@@ -578,7 +622,7 @@ emmeans(model_change, pairwise ~ time_window | sex)
 # strong increase at 11:00, decrease during day, small increase at night
 
 
-### 7. Visualization: smooth trend over time
+#### 7. Visualization: smooth trend over time ####
 
 # Shows continuous pattern (not statistical test)
 
@@ -629,22 +673,29 @@ ggplot(analysis_data, aes(x = time_h, y = weight)) +
   )
 
 ___________________________________________________________
+_____________________________________________________________________
 #### Cas: Control ####
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(janitor)
+library(stringr)
+library(readr)
+library(lubridate)
+
+# Build Cas control dataset
 
 cas_control <- CicTen %>%
   
-  # clean column names
   clean_names() %>%
   
-  # trim whitespace in all character columns
   mutate(across(where(is.character), str_squish)) %>%
   
-  # make number numeric
   mutate(
     number = parse_number(as.character(number))
   ) %>%
   
-  # convert weight columns to numeric
   mutate(
     across(
       starts_with("weight"),
@@ -652,23 +703,19 @@ cas_control <- CicTen %>%
     )
   ) %>%
   
-  # keep only Cas control group
   filter(
     species == "Cas",
     purpose == "C. Weight"
   ) %>%
   
-  # remove biologically wrong individuals
   filter(!number %in% remove_ids_cas) %>%
   
-  # remove unused columns
   select(
     -notes,
     -pressure_bomb_bar,
     -starts_with("time_slot")
   ) %>%
   
-  # rename date/time columns
   rename(
     date_1 = date_of_action,
     date_2 = date_of_second_action,
@@ -679,7 +726,6 @@ cas_control <- CicTen %>%
     time_3 = time_of_third_action
   ) %>%
   
-  # rebuild event structure
   transmute(
     number,
     species,
@@ -687,30 +733,25 @@ cas_control <- CicTen %>%
     purpose,
     sampling_date,
     
-    # keep original weights safe
     w1 = weight_1,
     w2 = weight_2,
     
-    # event 1
     action_1 = action_1,
     date_1   = date_1,
     time_1   = time_1,
     weight_1 = w1,
     
-    # event 2
     action_2 = action_2,
     date_2   = date_2,
     time_2   = time_2,
     weight_2 = NA_real_,
     
-    # event 3
     action_3 = action_3,
     date_3   = date_3,
     time_3   = time_3,
     weight_3 = w2
   ) %>%
   
-  # pivot to long format
   pivot_longer(
     cols = c(
       action_1, date_1, time_1, weight_1,
@@ -721,9 +762,10 @@ cas_control <- CicTen %>%
     names_pattern = "(action|date|time|weight)_(\\d)"
   ) %>%
   
-  mutate(event = as.integer(event)) %>%
+  mutate(
+    event = as.integer(event)
+  ) %>%
   
-  # remove fully empty events
   filter(!(is.na(action) & is.na(date) & is.na(time) & is.na(weight))) %>%
   
   arrange(number, event) %>%
@@ -741,104 +783,127 @@ cas_control <- CicTen %>%
     weight
   )
 
- view(cas_control)
- 
- ## Plot
- 
- # time window
- cols_all <- palette.colors(12, palette = "Paired")
- 
- time_blocks <- data.frame(
-   period = c("morning", "afternoon"),
-   xmin = c(8, 12),
-   xmax = c(11, 17),
-   ymin = -Inf,
-   ymax = Inf
- )
- 
- bg_cols <- c(
-   "morning"   = cols_all[7],
-   "afternoon" = cols_all[5]
- )
- 
- library(dplyr)
- library(ggplot2)
- 
- fig_weight_time <- ggplot() +
-   
-   geom_rect(
-     data = time_blocks,
-     aes(
-       xmin = xmin,
-       xmax = xmax,
-       ymin = ymin,
-       ymax = ymax,
-       fill = period
-     ),
-     alpha = 0.2,
-     inherit.aes = FALSE,
-     show.legend = FALSE
-   ) +
-   
-   geom_line(
-     data = plot_weight,
-     aes(
-       x = time_h,
-       y = weight,
-       group = number
-     ),
-     linewidth = 0.5,
-     alpha = 0.7,
-     color = "grey35"
-   ) +
-   
-   geom_point(
-     data = plot_weight,
-     aes(
-       x = time_h,
-       y = weight,
-       color = sex,
-       shape = sex
-     ),
-     size = 2.8,
-     alpha = 0.9
-   ) +
-   
-   scale_color_manual(
-     values = c(
-       "female" = cols_all[9],
-       "male"   = cols_all[10]
-     )
-   ) +
-   
-   scale_fill_manual(values = bg_cols) +
-   
-   scale_shape_manual(
-     values = c(
-       "female" = 15,
-       "male"   = 7
-     )
-   ) +
-   
-   scale_y_continuous(
-     labels = function(x) sprintf("%.3f", x)
-   ) +
-   
-   scale_x_continuous(
-     breaks = seq(6, 22, by = 2),
-     labels = function(x) sprintf("%02d:00", x)
-   ) +
-   
-   labs(
-     x = "Time of day",
-     y = "Bodyweight (g)",
-     color = "Sex",
-     shape = "Sex"
-   ) +
-   
-   theme_classic()
- 
- fig_weight_time
+View(cas_control)
+
+write_csv(cas_control, "data/cas_control.csv")
+
+# Create plotting dataset
+
+plot_cas_control <- cas_control %>%
+  mutate(
+    time = as.character(time),
+    time = str_trim(time),
+    time = if_else(
+      str_detect(time, "^\\d{1,2}:\\d{2}$"),
+      paste0(time, ":00"),
+      time
+    ),
+    time_h = hour(hms(time)) +
+      minute(hms(time)) / 60 +
+      second(hms(time)) / 3600
+  ) %>%
+  filter(!is.na(time_h), !is.na(weight))
+
+# Optional check
+plot_cas_control %>%
+  select(number, event, action, time, time_h, weight)
+
+
+# Plot settings
+
+cols_all <- palette.colors(12, palette = "Paired")
+
+time_blocks <- data.frame(
+  period = c("morning", "afternoon"),
+  xmin = c(8, 12),
+  xmax = c(11, 17),
+  ymin = -Inf,
+  ymax = Inf
+)
+
+bg_cols <- c(
+  "morning"   = cols_all[7],
+  "afternoon" = cols_all[5]
+)
+
+# Plot using cas_control data
+
+
+fig_weight_time_C <- ggplot() +
+  
+  geom_rect(
+    data = time_blocks,
+    aes(
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax,
+      fill = period
+    ),
+    alpha = 0.2,
+    inherit.aes = FALSE,
+    show.legend = FALSE
+  ) +
+  
+  geom_line(
+    data = plot_cas_control,
+    aes(
+      x = time_h,
+      y = weight,
+      group = number
+    ),
+    linewidth = 0.5,
+    alpha = 0.7,
+    color = "grey35"
+  ) +
+  
+  geom_point(
+    data = plot_cas_control,
+    aes(
+      x = time_h,
+      y = weight,
+      color = sex,
+      shape = sex
+    ),
+    size = 2.8,
+    alpha = 0.9
+  ) +
+  
+  scale_color_manual(
+    values = c(
+      "female" = cols_all[9],
+      "male"   = cols_all[10]
+    )
+  ) +
+  
+  scale_fill_manual(values = bg_cols) +
+  
+  scale_shape_manual(
+    values = c(
+      "female" = 15,
+      "male"   = 7
+    )
+  ) +
+  
+  scale_y_continuous(
+    labels = function(x) sprintf("%.3f", x)
+  ) +
+  
+  scale_x_continuous(
+    breaks = seq(8, 18, by = 2),
+    labels = function(x) sprintf("%02d:00", x)
+  ) +
+  
+  labs(
+    x = "Time of day",
+    y = "Bodyweight (g)",
+    color = "Sex",
+    shape = "Sex"
+  ) +
+  
+  theme_classic()
+
+fig_weight_time_C
 
  #### Control: loss in percent ####
  library(dplyr)

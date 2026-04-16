@@ -1,0 +1,22 @@
+number,species,sex,purpose,sampling_date,event,action,date,time,weight
+174,Cas,female,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.7878
+174,Cas,female,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+174,Cas,female,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.7737
+175,Cas,female,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.6339
+175,Cas,female,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+175,Cas,female,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.6061
+176,Cas,female,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.8576
+176,Cas,female,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+176,Cas,female,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.8381
+177,Cas,female,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.752
+177,Cas,female,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+177,Cas,female,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.7401
+178,Cas,female,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.7527
+178,Cas,female,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+178,Cas,female,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.7358
+179,Cas,female,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.6428
+179,Cas,female,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+179,Cas,female,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.6174
+180,Cas,male,C. Weight,22.05.25,1,lab,23.05.25,08:50:00,0.3137
+180,Cas,male,C. Weight,22.05.25,2,field,23.05.25,09:00:00,NA
+180,Cas,male,C. Weight,22.05.25,3,bodyweight,23.05.25,12:00:00,0.2973
