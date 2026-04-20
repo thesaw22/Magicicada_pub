@@ -1,8 +1,4 @@
 number,species,sex,purpose,sampling_date,event,action,date,time,weight,time_slot_of_first_action,time_slot_of_third_action,time_slot_of_fourth_action
-43,Dec,female,Excretion,18.05.25,1,lab,18.05.25,13:20:00,0.7111,NA,NA,NA
-43,Dec,female,Excretion,18.05.25,2,field,18.05.25,14:45:00,NA,NA,NA,NA
-43,Dec,female,Excretion,18.05.25,3,bodyweight,19.05.25,09:30:00,0.7215,NA,NA,NA
-43,Dec,female,Excretion,18.05.25,4,pee,19.05.25,12:00:00,0.0142,NA,NA,NA
 57,Dec,female,Excretion,18.05.25,1,lab,19.05.25,15:00:00,0.6696,NA,NA,NA
 57,Dec,female,Excretion,18.05.25,2,field,19.05.25,15:30:00,NA,NA,NA,NA
 57,Dec,female,Excretion,18.05.25,3,pee,20.05.25,10:30:00,0.0201,NA,NA,NA
