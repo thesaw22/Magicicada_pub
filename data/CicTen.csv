@@ -121,7 +121,7 @@
 #120;Excretion;21.05.25;male;Dec;22.05.25;09:30;;lab ;0,3528;22.05.25;10:00;field;10.9 -> 11.5;22.05.25;17:30;;pee;;22.05.25;17:30;;bodyweight ;0,3974;;;;;lost
 #121;Excretion;21.05.25;male;Dem;22.05.25;09:30;noon;lab ;0,5350;22.05.25;10:00;field;10.9 -> 11.5;22.05.25;17:30;noon;pee;0,0213;22.05.25;17:30;;bodyweight ;0,5324;;;;;
 #122;Excretion;21.05.25;male;Dem;22.05.25;09:30;;lab ;0,4626;22.05.25;10:00;field;11.0 -> 7.9;22.05.25;17:30;;pee;0,0609;22.05.25;17:30;;bodyweight ;0,5426;;;;;lost
-#123;Excretion;21.05.25;female;Dem;22.05.25;09:30;;lab ;0,9785;22.05.25;10:00;field;11.0 -> 7.9;22.05.25;17:30;;pee;0,0022;22.05.25;17:30;;bodyweight ;1,1181;;;;;"blocked; brown pee"
+#123;Excretion;21.05.25;female;Dem;22.05.25;09:30;noon;lab ;0,9785;22.05.25;10:00;field;11.0 -> 7.9;22.05.25;17:30;noon;pee;0,0022;22.05.25;17:30;;bodyweight ;1,1181;;;;;"blocked; brown pee"
 #124;Weight;21.05.25;female;Cas;22.05.25;06:30;;lab ;0,8119;22.05.25;08:00;field;;22.05.25;11:00;;bodyweight ;0,9056;22.05.25;17:30;;bodyweight ;0,8310;22.05.25;20:30;bodyweight;0,8721;"Control 10; lost wing = weight with wing: 0.8310; without: 0.8231"
 #125;Weight;21.05.25;male;Cas;22.05.25;06:30;;lab ;0,4553;22.05.25;08:00;field;;22.05.25;11:00;;bodyweight ;0,5211;22.05.25;17:30;;bodyweight ;0,5066;22.05.25;20:30;bodyweight;0,5204;Control 10
 #126;Weight;21.05.25;male;Cas;22.05.25;06:30;;lab ;0,4481;22.05.25;08:00;field;;22.05.25;11:00;;bodyweight ;0,5131;22.05.25;17:30;;bodyweight ;0,4650;22.05.25;20:30;bodyweight;0,4519;Control 10
