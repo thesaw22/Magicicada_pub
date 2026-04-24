@@ -400,3 +400,169 @@ pB <- ggplot() +
 # Combine vertically
 
 pA / pB
+
+#### Plot with horizontal timewindow blocks ####
+
+library(ggplot2)
+library(dplyr)
+
+# Color theme
+cols_all <- palette.colors(12, palette = "Paired")
+
+bg_cols <- c(
+  "Morning"   = cols_all[5],
+  "Afternoon" = cols_all[9],
+  "Evening"   = cols_all[3],
+  "Night"     = cols_all[1]
+)
+
+# Convert pressure from bar → MPa
+pressure_summary_all_mpa <- pressure_summary_all %>%
+  mutate(
+    mean_pressure_mpa = mean_pressure * 0.1,
+    min_pressure_mpa  = min_pressure * 0.1,
+    max_pressure_mpa  = max_pressure * 0.1
+  )
+
+# Time blocks
+time_blocks_A <- data.frame(
+  time_window = c("Night", "Morning", "Afternoon", "Evening", "Night"),
+  xmin = as.POSIXct(c("05:00", "07:00", "10:00", "17:00", "20:00"), format = "%H:%M"),
+  xmax = as.POSIXct(c("07:00", "10:00", "17:00", "20:00", "21:00"), format = "%H:%M")
+)
+
+time_blocks_B <- data.frame(
+  time_window = c("Morning", "Afternoon", "Evening"),
+  xmin = as.POSIXct(c("08:00", "12:00", "18:00"), format = "%H:%M"),
+  xmax = as.POSIXct(c("11:00", "17:00", "20:00"), format = "%H:%M")
+)
+
+# Combine blocks
+time_blocks_combined <- bind_rows(
+  time_blocks_A %>% mutate(species_group = "Dec + Dem"),
+  time_blocks_B %>% mutate(species_group = "Cas")
+) %>%
+  mutate(
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    
+    ymin = case_when(
+      species_group == "Dec + Dem" ~ -1.98,
+      species_group == "Cas"       ~ -1.84
+    ),
+    
+    ymax = case_when(
+      species_group == "Dec + Dem" ~ -1.87,
+      species_group == "Cas"       ~ -1.73
+    ),
+    
+    y_label = (ymin + ymax) / 2,
+    x_label = xmin + (xmax - xmin) / 2
+  )
+
+# Plot
+p_xylem <- ggplot() +
+  
+  # Time blocks
+  geom_rect(
+    data = time_blocks_combined,
+    aes(
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax,
+      fill = time_window
+    ),
+    color = "black",
+    linewidth = 0.4,
+    alpha = 0.55
+  ) +
+  
+  # Labels inside blocks
+  geom_text(
+    data = time_blocks_combined,
+    aes(x = x_label, y = y_label, label = time_window),
+    size = 3
+  ) +
+  
+  # Xylem pressure
+  geom_line(
+    data = pressure_summary_all_mpa,
+    aes(x = time_posix, y = mean_pressure_mpa),
+    linewidth = 1,
+    color = "black"
+  ) +
+  
+  geom_point(
+    data = pressure_summary_all_mpa,
+    aes(x = time_posix, y = mean_pressure_mpa),
+    size = 2,
+    color = "black"
+  ) +
+  
+  geom_errorbar(
+    data = pressure_summary_all_mpa,
+    aes(
+      x = time_posix,
+      ymin = min_pressure_mpa,
+      ymax = max_pressure_mpa
+    ),
+    width = 0.05,
+    color = "black"
+  ) +
+  
+  # Species labels OUTSIDE plot
+  annotate(
+    "text",
+    x = as.POSIXct("21:20", format = "%H:%M"),
+    y = -1.925,
+    label = "Dec + Dem",
+    hjust = 0,
+    size = 3.5
+  ) +
+  
+  annotate(
+    "text",
+    x = as.POSIXct("21:20", format = "%H:%M"),
+    y = -1.785,
+    label = "Cas",
+    hjust = 0,
+    size = 3.5
+  ) +
+  
+  # Axes
+  scale_x_datetime(
+    date_breaks = "2 hours",
+    date_labels = "%H:%M"
+  ) +
+  
+  scale_y_reverse(
+    breaks = seq(0, -2.0, by = -0.2)
+  ) +
+  
+  # Zoom without removing annotations
+  coord_cartesian(
+    xlim = as.POSIXct(c("05:00", "21:00"), format = "%H:%M"),
+    ylim = c(0, -2.0),
+    clip = "off"
+  ) +
+  
+  scale_fill_manual(
+    values = bg_cols,
+    drop = FALSE
+  ) +
+  
+  labs(
+    x = "Time",
+    y = "Xylem Pressure (MPa)"
+  ) +
+  
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(5.5, 90, 5.5, 5.5)
+  )
+
+p_xylem
