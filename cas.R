@@ -159,8 +159,8 @@ library(scales)
 paired <- palette.colors(12, "Paired")
 
 bg_cols <- c(
-  "morning"   = paired[7],
-  "afternoon" = paired[5],
+  "morning"   = paired[5],
+  "afternoon" = paired[9],
   "evening"   = paired[3]
 )
 
@@ -358,6 +358,116 @@ fig_weight_time <- ggplot() +
   theme_classic()
 
 fig_weight_time
+
+#### postiive and negtive bodychange ####
+library(dplyr)
+library(ggplot2)
+
+plot_weight <- cicten_tidy_cas %>%
+  filter(!is.na(time), !is.na(weight)) %>%
+  mutate(
+    time_h = as.numeric(time) / 3600   # seconds → hours
+  ) %>%
+  arrange(number, time_h) %>%
+  group_by(number) %>%
+  mutate(
+    delta_weight = weight - lag(weight),
+    change_dir = case_when(
+      delta_weight > 0 ~ "gain",
+      delta_weight < 0 ~ "loss",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  ungroup()
+
+time_blocks <- data.frame(
+  period = c("morning", "afternoon", "evening"),
+  xmin = c(8, 12, 18),
+  xmax = c(11, 17, 20),
+  ymin = -Inf,
+  ymax = Inf
+)
+
+fig_weight_time_2 <- ggplot() +
+  
+  geom_rect(
+    data = time_blocks,
+    aes(
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax,
+      fill = period
+    ),
+    alpha = 0.22,
+    inherit.aes = FALSE,
+    show.legend = FALSE
+  ) +
+  
+  geom_line(
+    data = plot_weight,
+    aes(
+      x = time_h,
+      y = weight,
+      group = number
+    ),
+    linewidth = 0.5,
+    alpha = 0.7,
+    color = "grey35"
+  ) +
+  
+  geom_point(
+    data = plot_weight,
+    aes(
+      x = time_h,
+      y = weight,
+      shape = sex,
+      color = change_dir
+    ),
+    size = 2.8,
+    stroke = 0.8
+  ) +
+  
+  scale_fill_manual(values = bg_cols) +
+  
+  scale_color_manual(
+    values = c(
+      "gain" = "black",
+      "loss" = "grey65"
+    ),
+    na.value = "black",
+    name = "Weight change",
+    labels = c(
+      "gain" = "Gain",
+      "loss" = "Loss"
+    )
+  ) +
+  
+  scale_shape_manual(
+    values = c(
+      "female" = 15,
+      "male"   = 7
+    )
+  ) +
+  
+  scale_y_continuous(
+    labels = function(x) sprintf("%.3f", x)
+  ) +
+  
+  scale_x_continuous(
+    breaks = seq(6, 22, by = 2),
+    labels = function(x) sprintf("%02d:00", x)
+  ) +
+  
+  labs(
+    x = "Time window",
+    y = "Bodyweight (g)",
+    shape = "Sex"
+  ) +
+  
+  theme_classic()
+
+fig_weight_time_2
 
 #### statistics ####
 library(dplyr)
@@ -822,8 +932,8 @@ time_blocks <- data.frame(
 )
 
 bg_cols <- c(
-  "morning"   = cols_all[7],
-  "afternoon" = cols_all[5]
+  "morning"   = cols_all[5],
+  "afternoon" = cols_all[9]
 )
 
 # Plot using cas_control data
@@ -905,7 +1015,62 @@ fig_weight_time_C <- ggplot() +
 
 fig_weight_time_C
 
- #### Control: loss in percent ####
+#### stacking cas and control ####
+
+library(patchwork)
+
+# Shared axis settings
+y_range <- range(plot_weight$weight, na.rm = TRUE)
+
+y_pad <- diff(y_range) * 0.03   # ~3% padding
+
+y_limits <- c(
+  y_range[1] - y_pad,
+  y_range[2] + y_pad
+)
+
+# Panel A
+fig_weight_time_A <- fig_weight_time +
+  scale_x_continuous(
+    breaks = x_breaks,
+    labels = x_labels,
+    limits = range(x_breaks)
+  ) +
+  coord_cartesian(ylim = y_limits) +
+  labs(title = "A", x = NULL) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_line(),   # keep ticks for alignment
+    legend.position = "none",
+    plot.margin = margin(5.5, 10, 2, 5.5)
+  )
+
+# Panel B
+fig_weight_time_B <- fig_weight_time_C +
+  scale_x_continuous(
+    breaks = x_breaks,
+    labels = x_labels,
+    limits = range(x_breaks)
+  ) +
+  coord_cartesian(ylim = y_limits) +
+  labs(title = "B", x = "Time window") +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    plot.margin = margin(2, 10, 5.5, 5.5),
+    legend.position = "right"
+  )
+
+# Stack panels
+fig_weight_stacked <- fig_weight_time_A / fig_weight_time_B +
+  plot_layout(guides = "collect") &
+  theme(
+    legend.position = "none"
+  )
+
+fig_weight_stacked
+
+#### Control: loss in percent ####
  library(dplyr)
  library(ggplot2)
  
