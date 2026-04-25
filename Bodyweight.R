@@ -48,9 +48,9 @@ fig_bw <- ggplot(bodyweight_1,
   
   scale_color_manual(
     values = c(
-      "Cas" = cols_all[10],
-      "Dec" = cols_all[9],
-      "Dem" = cols_all[12]
+      "Cas" = cols_all[12],
+      "Dec" = cols_all[7],
+      "Dem" = cols_all[8]
     ),
     guide = "none"
   ) +
@@ -149,6 +149,14 @@ pairwise.wilcox.test(
 # → All species differ from each other
 # → Dem seems most distinct (very small p-values vs both others)
 
+install.packages("coin")
+library(coin)
+
+library(rstatix)
+
+bodyweight_1 %>%
+  wilcox_effsize(bodyweight_1 ~ species)
+
 ## 4. Normality check
 by(bodyweight_1$bodyweight_1, bodyweight_1$species, shapiro.test)
 
@@ -190,11 +198,13 @@ ______________________________________________
 library(ggpubr)
 
 fig_bw +
-  stat_compare_means(
-    aes(group = sex),
-    method = "wilcox.test",
-    label = "p.signif"
-  )
+
+stat_summary(
+  fun = median,
+  geom = "point",
+  size = 3,
+  color = "black"
+)
 
 # Interpretation:
 # Adds significance stars for male vs female within each species
