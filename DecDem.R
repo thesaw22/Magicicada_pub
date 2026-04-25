@@ -1802,11 +1802,18 @@ plot_data_pos %>%
 
 
 #----------------------------------------------------------------
-#### 1. Excretion probability ####
+#### Excretion probability ####
+# Question:
+# Does the probability of excreting differ among time windows?
+#
+# Data used:
+# ALL observations, because individuals that did NOT excrete are biologically
+# important for estimating probability.
+
 
 library(dplyr)
 library(ggplot2)
-library(patchwork)
+library(logistf)
 
 cols_all <- palette.colors(12, palette = "Paired")
 
@@ -1831,13 +1838,25 @@ excretion_rate <- pee_data %>%
   group_by(time_window) %>%
   summarise(
     n = n(),
-    n_peed = sum(peed, na.rm = TRUE),
-    prop = n_peed / n,
+    n_peed = sum(peed),
+    prop_peed = n_peed / n,
     .groups = "drop"
   )
 
-prob_plot <- ggplot(excretion_rate, aes(x = time_window, y = prop, fill = time_window)) +
-  geom_col(width = 0.7, alpha = 0.85) +
+excretion_rate
+
+# Interpretation:
+# Morning:    21/25 = 0.84
+# Afternoon:   6/6 = 1.00
+# Evening:    9/15 = 0.60
+# Night:      6/12 = 0.50
+
+# Excretion probability is highest in Afternoon and Morning,
+# and lower in Evening and Night.
+
+prob_plot <- ggplot(excretion_rate,
+                    aes(x = time_window, y = prop_peed, fill = time_window)) +
+  geom_col(width = 0.7, alpha = 0.85, color = "black") +
   geom_text(
     aes(label = paste0(n_peed, "/", n)),
     vjust = -0.5,
@@ -1856,477 +1875,538 @@ prob_plot <- ggplot(excretion_rate, aes(x = time_window, y = prop, fill = time_w
 
 prob_plot
 
-#### 2: Logistic regression #####
-
-library(logistf)
-
-## 1. Firth logistic regression
-
-glm_firth <- logistf(peed ~ time_window, data = pee_data)
-summary(glm_firth)
-
-# Interpretation:
-# This model tests whether the probability of peeing changes across time windows.
-# Firth logistic regression is appropriate here because you likely have small sample sizes
-# and possible separation issues (for example, Morning appears to have a probability of 1.0).
-
-# Reference level:
-# The intercept corresponds to the reference category, which is Morning
-# (unless you changed the factor order).
-
-# Intercept:
-# coef = 2.565, p = 0.0135
-# → In the Morning, the log-odds of peeing are significantly greater than zero
-# → This corresponds to a very high peeing probability in the Morning
-
-# Afternoon:
-# coef = -2.242, p = 0.0590
-# → Compared with Morning, peeing probability tends to be lower in the Afternoon
-# → This is a trend, but not conventionally significant at p < 0.05
-
-# Evening:
-# coef = -2.565, p = 0.0387
-# → Compared with Morning, peeing probability is significantly lower in the Evening
-
-# Night:
-# coef = -1.202, p = 0.374
-# → Compared with Morning, Night is not significantly different
-
-# Important:
-# These coefficients compare each time window directly against Morning only.
-# They do NOT test all pairwise differences between all time windows.
+#### Firth logistic regression ####
+# Why this test?
+#
+# The response variable is binary:
+#   peed = 0 or 1
+#
+# Therefore, logistic regression is appropriate.
+#
+# However, Afternoon has complete separation:
+#   Afternoon = 6/6 individuals peed
+#
+# Standard logistic regression can behave badly with complete separation.
+# Firth logistic regression corrects this problem and gives more stable estimates.
 
 
-## 2. Overall model test
+model_firth <- logistf(peed ~ time_window, data = pee_data)
 
-# Likelihood ratio test from logistf:
-# LR test = 7.27 on 3 df, p = 0.0637
+summary(model_firth)
 
 # Interpretation:
-# The overall effect of time_window in the Firth model is borderline / trend-level
-# → suggests some time dependence, but evidence is moderate rather than strong
+#
+# Overall likelihood-ratio test:
+# p = 0.057
+#
+# This is slightly above 0.05, so the overall time-window effect is
+# borderline / suggestive, but not conventionally significant by the
+# Firth likelihood-ratio test.
+#
+# Coefficients are compared against the reference level: Morning.
+#
+# Afternoon vs Morning:
+# p = 0.475
+# No significant difference.
+# Afternoon has 100% excretion, but n = 6 is small.
+#
+# Evening vs Morning:
+# p = 0.098
+# Trend toward lower excretion probability in Evening.
+#
+# Night vs Morning:
+# p = 0.036
+# Night has significantly lower excretion probability than Morning.
+#
+# Biological interpretation:
+# Excretion probability appears to decline later in the day,
+# especially at Night, but the overall Firth model is borderline.
 
-# Wald test from logistf:
-# Wald test = 11.83 on 3 df, p = 0.0080
+
+#### Fisher's exact test ####
+# Why this test?
+#
+# This is a non-parametric test for association between two categorical variables:
+#   time_window and peed
+#
+# It is useful here because some sample sizes are small,
+# especially Afternoon n = 6.
+#
+# Fisher's exact test does not rely on large-sample chi-square assumptions.
+
+pee_table <- table(pee_data$time_window, pee_data$peed)
+
+pee_table
+
+fisher.test(pee_table)
 
 # Interpretation:
-# The Wald test suggests a significant overall effect of time_window
-# → however, for small or sparse datasets, the likelihood ratio test is usually preferred
-# → therefore, I would interpret the overall Firth result cautiously:
-#    there is suggestive evidence that peeing probability changes with time
-
-
-
-## 3. Standard logistic regression ANOVA
-
-anova(glm_pee, test = "Chisq")
-
-# Interpretation:
-# Analysis of deviance gives p = 0.0247
-# → In the standard binomial model, time_window significantly affects peeing probability
+#
+# Fisher's exact test p = 0.040
+#
+# This suggests that excretion probability is not equal across time windows.
 #
 # Together with the Firth model:
-# → both analyses point in the same direction:
-#    peeing probability likely varies across time windows
-# → but the exact strength of evidence depends on the method used
-
-
-## 4. Pairwise comparisons using emmeans
-
-
-emmeans(glm_pee, pairwise ~ time_window, type = "response")
-
-# Estimated probabilities:
-# Morning   = 1.000
-# Afternoon = 0.583
-# Evening   = 0.500
-# Night     = 0.808
-
-# Interpretation:
-# Morning has the highest estimated peeing probability
-# Evening has the lowest estimated peeing probability
-# Night is also high
-# Afternoon is intermediate
-
-# Biological pattern:
-# Morning   → very high peeing probability
-# Afternoon → lower
-# Evening   → lowest
-# Night     → rises again
-
-
-## 5. Pairwise contrasts
-
-# Morning / Afternoon: p = 1.000
-# Morning / Evening:   p = 1.000
-# Morning / Night:     p = 1.000
-# Afternoon / Evening: p = 0.965
-# Afternoon / Night:   p = 0.325
-# Evening / Night:     p = 0.235
-
-# Interpretation:
-# None of the pairwise comparisons are significant after Tukey adjustment.
+# - Fisher's test supports a time-window effect.
+# - Firth logistic regression gives a borderline overall effect,
+#   but identifies Night as lower than Morning.
 #
-# This can happen even when the overall test is significant or near significant:
-# → the overall model detects a general time effect
-# → but individual pairwise contrasts may lack power,
-#   especially with small sample sizes and unequal probabilities
+# Conservative conclusion:
+# Excretion probability varies with time window, with the clearest decrease
+# occurring at Night compared with Morning.
 
 
-## 6. Why Morning looks strange
-
-# Morning probability = 1.000 with extremely small SE
-# → This suggests complete or near-complete separation:
-#    all or almost all Morning individuals peed
+#### Input rate: positive input only ####
+# Question:
+# Among individuals with positive input, does the amount of input differ
+# among time windows?
 #
-# Because of this:
-# → odds ratios involving Morning become extremely large
-# → pairwise tests become unstable and hard to interpret
-# → this is exactly why the Firth model is useful here
-
-
-## 7. Final interpretation
-
-# 1. Overall, peeing probability appears to vary across time windows
-
-# 2. The strongest evidence is that:
-#    - Evening is lower than Morning
-#    - Afternoon may also be lower than Morning
-#    - Night is not clearly different from Morning
-
-# 3. However, no pairwise comparisons are significant after multiple-testing correction
-
-# 4. Therefore, the safest conclusion is:
-#    → there is evidence for an overall time-of-day effect on peeing probability,
-#      but the exact pairwise differences between time windows remain uncertain
-
-# Clean takeaway:
-# → Peeing probability is highest in the Morning,
-#   declines in the Afternoon and Evening,
-#   and increases again at Night
-# → The overall time pattern is supported,
-#   but pairwise post-hoc contrasts are weak due to limited power and separation
-
-#### 3: Distribution + sample size #####
-
-pee_data %>%
-  group_by(time_window) %>%
-  summarise(n = n(), .groups = "drop")
-
-#### 4: Approximate power #####
-
-pwr.anova.test(
-  k = 4,
-  n = 15,
-  f = 0.25,
-  sig.level = 0.05
-)
-
-pwr.anova.test(
-  k = 4,
-  f = 0.25,
-  sig.level = 0.05,
-  power = 0.8
-)
-
-
-
-#----------------------------------------------------------------
-#### 1: comparing weight and g/hr ####
+# Data used:
+# ONLY observations with input_g_hr > 0.
+#
+# This is different from excretion probability.
+# Here we are not asking whether input happened.
+# We are asking how high input was when input occurred.
 
 library(dplyr)
+library(ggplot2)
+library(rstatix)
+library(ggpubr)
 
-## 1. Prepare dataset
+plot_data_pos <- final_cicten %>%
+  filter(
+    !is.na(time_window),
+    !is.na(input_g_hr),
+    input_g_hr > 0
+  ) %>%
+  mutate(
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    )
+  )
 
-input_bw_data <- final_cicten_pos %>%
-  select(number, species, sex, input_g_hr, lab_weight) %>%
-  filter(!is.na(input_g_hr), !is.na(lab_weight))
+input_summary <- plot_data_pos %>%
+  group_by(time_window) %>%
+  summarise(
+    n = n(),
+    mean_input = mean(input_g_hr),
+    sd_input = sd(input_g_hr),
+    median_input = median(input_g_hr),
+    min_input = min(input_g_hr),
+    max_input = max(input_g_hr),
+    .groups = "drop"
+  )
 
-input_bw_data <- input_bw_data %>%
-  mutate(input_mass_specific = input_g_hr / lab_weight)
-
-# input_mass_specific standardizes input by body size
-# → allows testing whether species differ independent of size
-
-
-## 2. Species difference (mass-specific input)
-
-wilcox.test(input_mass_specific ~ species, data = input_bw_data)
+input_summary
 
 # Interpretation:
-# p = 0.366
-# → No significant difference between species (Dec vs Dem)
-# → After correcting for body size, both species have similar input rates
 #
-# Biological meaning:
-# → Any raw differences in input are not due to species-specific physiology,
-#   but rather reflect similar size-normalized feeding rates
-
-
-## 3. Linear model: input ~ body size * species
-
-model_bw <- lm(input_g_hr ~ lab_weight * species, data = input_bw_data)
-summary(model_bw)
-
-# Intercept:
-# Estimate = 0.0314, p = 0.107
-# → Baseline input (Dec at lab_weight = 0) is not significant
-# → Not biologically meaningful (weight = 0 is outside real range)
-
-# lab_weight:
-# Estimate = -0.0133, p = 0.690
-# → No relationship between body size and input rate
-# → Larger individuals do NOT show higher or lower input
+# Morning:
+# n = 24, mean = 0.0407 g/hr, median = 0.0315 g/hr
 #
-# Key conclusion:
-# → Input does NOT scale with body size in this dataset
-
-# species (Dem vs Dec):
-# Estimate = -0.00549, p = 0.838
-# → No difference in baseline input between species
+# Afternoon:
+# n = 6, mean = 0.0120 g/hr, median = 0.0100 g/hr
 #
-# → Confirms Wilcoxon test result:
-#    species do not differ in input rate
-
-# interaction (lab_weight × species):
-# Estimate = 0.0231, p = 0.556
-# → No difference in scaling between species
-# → Both species show the same (non-existent) relationship with body size
-
-
-## 5. Model fit
-
-# R² = 0.036
-# Adjusted R² = -0.016
+# Evening:
+# n = 11, mean = 0.0364 g/hr, median = 0.0320 g/hr
 #
-# → Model explains essentially none of the variation in input
-# → Predictors (size + species) have very low explanatory power
+# Night:
+# n = 10, mean = 0.0175 g/hr, median = 0.00614 g/hr
+#
+# Input rate is highest in Morning and Evening,
+# and lower in Afternoon and Night.
 
-# F-statistic p = 0.563
-# → Overall model is not significant
-# → Cannot reject null hypothesis that all coefficients = 0
+
+#### Kruskal-Wallis test ####
+# Why this test?
+#
+# Input rate is continuous, but sample sizes are uneven and small
+# in some time windows.
+#
+# The data are also likely non-normal and skewed.
+#
+# Kruskal-Wallis is a non-parametric alternative to one-way ANOVA.
+# It tests whether input-rate distributions differ among time windows.
 
 
-## 6. Final biological interpretation
+kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
 
-# 1. No species effect:
-#    → Dec and Dem have similar input rates
+# Interpretation:
+#
+# Kruskal-Wallis chi-squared = 14.888
+# df = 3
+# p = 0.001915
+#
+# Input rate differs significantly among time windows.
+#
+# This test only says that at least one time window differs.
+# It does not say which specific pairs differ.
 
-# 2. No size effect:
-#    → Input does not scale with body weight
 
-# 3. No interaction:
-#    → Species do not differ in how input relates to size
+#### Pairwise Wilcoxon tests ####
+# Why this test?
+#
+# After a significant Kruskal-Wallis test, pairwise Wilcoxon tests are used
+# to identify which time windows differ from each other.
+#
+# BH correction is used to control false discovery rate across multiple tests.
 
-# 4. Low explanatory power:
-#    → Variation in input is driven by other factors (e.g., time of day)
+pairwise_input <- plot_data_pos %>%
+  pairwise_wilcox_test(
+    input_g_hr ~ time_window,
+    p.adjust.method = "BH"
+  )
 
-# Clean takeaway:
-# → Input rate is independent of both species identity and body size
-# → This reinforces earlier results showing that time (not size or species)
-#   is the primary driver of variation in input
+pairwise_input
+
+# Interpretation:
+#
+# Significant comparisons:
+#
+# Morning vs Afternoon:
+# p.adj = 0.014
+# Morning input is significantly higher than Afternoon.
+#
+# Morning vs Night:
+# p.adj = 0.014
+# Morning input is significantly higher than Night.
+#
+# Afternoon vs Evening:
+# p.adj = 0.014
+# Evening input is significantly higher than Afternoon.
+#
+# Evening vs Night:
+# p.adj = 0.019
+# Evening input is significantly higher than Night.
+#
+# Non-significant comparisons:
+#
+# Morning vs Evening:
+# p.adj = 0.919
+# Morning and Evening input rates are similar.
+#
+# Afternoon vs Night:
+# p.adj = 0.958
+# Afternoon and Night input rates are similar.
+#
+# Biological interpretation:
+# Positive input rate follows a clear time-window pattern.
+# Input is high in Morning and Evening,
+# and low in Afternoon and Night.
+
+#### Overall conclusion: ####
+#
+# Excretion probability:
+# Excretion probability differed among time windows.
+# Fisher's exact test was significant (p = 0.040), while Firth logistic
+# regression showed a borderline overall time effect (p = 0.057).
+# Night had significantly lower excretion probability than Morning
+# in the Firth model (p = 0.036).
+#
+# Input rate:
+# Among observations with positive input, input rate differed strongly
+# among time windows (Kruskal-Wallis p = 0.0019).
+# Morning and Evening had higher input rates, whereas Afternoon and Night
+# had lower input rates.
+#
+# Important distinction:
+# Excretion probability and input rate answer different questions.
+# Excretion probability uses all observations.
+# Input rate uses only positive-input observations.
+
+#----------------------------------------------------------------
+#### Bodyweight and input rate: Dec vs Dem ####
+# Question:
+# Do Dec and Dem differ in input rate, and is this difference explained
+# by bodyweight?
+#
+# Data:
+# Positive input data only.
+
+library(dplyr)
+library(ggplot2)
 
 cols_all <- palette.colors(12, palette = "Paired")
 
-ggplot(input_bw_data, aes(x = lab_weight, y = input_g_hr, color = species)) +
+input_bw_data <- final_cicten_pos %>%
+  select(number, species, sex, input_g_hr, lab_weight) %>%
+  filter(
+    !is.na(input_g_hr),
+    !is.na(lab_weight),
+    !is.na(species),
+    !is.na(sex)
+  ) %>%
+  mutate(
+    species = factor(species, levels = c("Dec", "Dem")),
+    sex = factor(sex, levels = c("female", "male"))
+  )
+
+#### 1. Plot: species separated ####
+# This plot shows whether input rate changes with bodyweight
+# separately for Dec and Dem.
+
+plot_bodyweight_input_s <- ggplot(input_bw_data,
+                       aes(x = lab_weight,
+                           y = input_g_hr,
+                           color = species)) +
   
-  geom_point(
-    size = 3,
-    alpha = 0.85
-  ) +
+  geom_point(size = 3, alpha = 0.85) +
   
-  geom_smooth(
-    method = "lm",
-    se = TRUE
-  ) +
+  geom_smooth(method = "lm", se = TRUE) +
   
   scale_color_manual(
     values = c(
-      "Dec" = cols_all[9],
-      "Dem" = cols_all[12]
+      "Dec" = cols_all[7],
+      "Dem" = cols_all[8]
     )
   ) +
   
   labs(
     x = "Bodyweight (g)",
-    y = "Input (g/hr)",
+    y = "Input rate (g/hr)",
     color = "Species"
   ) +
   
   theme_classic()
 
-# Despite differences in body size, 
-#cicadas show no scaling of intake with mass and no species-specific intake strategy.
-#### sex difference ####
+plot_bodyweight_input_s
 
-# additive model 
-model_sex <- lm(input_g_hr ~ lab_weight * species + sex, data = input_bw_data)
-summary(model_sex)
+#### 2. Linear model: bodyweight + species ####
+# Why this test?
+#
+# This model tests whether input rate is related to bodyweight
+# and whether species differ after accounting for bodyweight.
+#
+# lab_weight:
+# Tests whether larger individuals have higher or lower input rate.
+#
+# species:
+# Tests whether Dec and Dem differ in input rate after controlling
+# for bodyweight.
 
-#Call:
-#  lm(formula = input_g_hr ~ lab_weight * species + sex, data = input_bw_data)
+model_species_bw <- lm(input_g_hr ~ lab_weight + species,
+                       data = input_bw_data)
 
-#Residuals:
-#  Min        1Q    Median        3Q       Max 
-#-0.029809 -0.016023 -0.008232  0.006636  0.147525 
+summary(model_species_bw)
+anova(model_species_bw)
 
-#Coefficients:
-#  Estimate Std. Error t value Pr(>|t|)  
-#(Intercept)            0.07776    0.03828   2.031   0.0472 *
-#lab_weight            -0.07917    0.05753  -1.376   0.1745  
-#speciesDem            -0.01350    0.02716  -0.497   0.6210  
-#sexmale               -0.02303    0.01652  -1.394   0.1689  
-#lab_weight:speciesDem  0.05684    0.04560   1.247   0.2179  
-#---
-#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# Interpretation based on your results:
+#
+# lab_weight:
+# p = 0.375
+# Bodyweight does not significantly explain input rate.
+#
+# species:
+# p = 0.403
+# Dec and Dem do not significantly differ in input rate after
+# accounting for bodyweight.
+#
+# Overall model:
+# p = 0.475
+# R² = 0.027
+#
+# The model explains very little variation in input rate.
+#
+# Biological conclusion:
+# There is no evidence that input rate differs between Dec and Dem
+# because of bodyweight differences.
 
-#Residual standard error: 0.03018 on 54 degrees of freedom
-#Multiple R-squared:  0.06968,	Adjusted R-squared:  0.0007694 
-#F-statistic: 1.011 on 4 and 54 DF,  p-value: 0.4099
 
-#full interaction
-model_full <- lm(input_g_hr ~ lab_weight * species * sex, data = input_bw_data)
-summary(model_full)
+#### Species and sex separated ####
+# Question:
+# Does the relationship between bodyweight and input rate differ
+# by species and sex?
 
-#Call:
-#  lm(formula = input_g_hr ~ lab_weight * species * sex, data = input_bw_data)
-
-#Residuals:
-#  Min        1Q    Median        3Q       Max 
-#-0.040347 -0.015268 -0.005519  0.008978  0.139948 
-
-#Coefficients:
-#  Estimate Std. Error t value Pr(>|t|)  
-#(Intercept)                    0.14762    0.07034   2.099   0.0408 *
-#lab_weight                    -0.17949    0.10252  -1.751   0.0860 .
-#speciesDem                    -0.11014    0.08073  -1.364   0.1784  
-#sexmale                       -0.10664    0.09601  -1.111   0.2719  
-#lab_weight:speciesDem          0.18019    0.10860   1.659   0.1032  
-#lab_weight:sexmale             0.13139    0.19802   0.663   0.5100  
-#speciesDem:sexmale             0.20584    0.15261   1.349   0.1834  
-#lab_weight:speciesDem:sexmale -0.30778    0.27218  -1.131   0.2634  
-#---
-#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-#Residual standard error: 0.03038 on 51 degrees of freedom
-#Multiple R-squared:   0.11,	Adjusted R-squared:  -0.01218 
-#F-statistic: 0.9003 on 7 and 51 DF,  p-value: 0.5136
-
-# plot
-cols_all <- palette.colors(12, palette = "Paired")
-
-ggplot(input_bw_data, 
-       aes(x = lab_weight, y = input_g_hr, 
-           color = species, shape = sex)) +
+plot_sex_species <- ggplot(input_bw_data,
+                           aes(x = lab_weight,
+                               y = input_g_hr,
+                               color = species,
+                               shape = sex)) +
   
-  geom_point(
-    size = 3,
-    alpha = 0.85
-  ) +
+  geom_point(size = 3, alpha = 0.85) +
   
-  geom_smooth(
-    method = "lm",
-    se = FALSE
-  ) +
+  geom_smooth(method = "lm", se = FALSE) +
+  
+  facet_wrap(~sex) +
   
   scale_color_manual(
     values = c(
-      "Dec" = cols_all[9],
-      "Dem" = cols_all[12]
+      "Dec" = cols_all[7],
+      "Dem" = cols_all[8]
     )
   ) +
   
   scale_shape_manual(
     values = c(
-      "female" = 15,  # square
-      "male"   = 7    # square with cross
+      "female" = 15,
+      "male"   = 7
     )
   ) +
   
   labs(
     x = "Bodyweight (g)",
-    y = "Input (g/hr)",
+    y = "Input rate (g/hr)",
     color = "Species",
     shape = "Sex"
   ) +
   
   theme_classic()
 
-# comparing within sex
-input_bw_data %>%
-  group_by(sex) %>%
-  summarise(
-    p_value = wilcox.test(input_g_hr ~ species)$p.value
-  )
-#sex    p_value
-#<chr>    <dbl>
-#1 female  0.0192 #females differ in dec & dem 
-#2 male    0.403 
+plot_sex_species
 
-#Species differences in input rate are sex-specific, occurring in females but not in males.
-#> While no overall effect of species or bodyweight on input rate was detected (linear models, p > 0.4)
-#> , analyses within sex revealed a significant species difference in females (Wilcoxon test, p = 0.019)
-#> , but not in males (p = 0.403), indicating a sex-specific pattern.
 
-ggplot(input_bw_data, 
-       aes(x = species, y = input_g_hr, color = species)) +
+#### 3. Additive model: bodyweight + species + sex ####
+#
+# This model tests whether input rate is explained independently by:
+# bodyweight, species, and sex.
+#
+# It does NOT test whether the species effect differs between males
+# and females.
+
+model_full <- lm(input_g_hr ~ lab_weight + species + sex,
+                 data = input_bw_data)
+
+summary(model_full)
+anova(model_full)
+
+# Interpretation based on your results:
+#
+# lab_weight:
+# p = 0.376
+# No significant effect of bodyweight.
+#
+# species:
+# p = 0.404
+# No significant overall difference between Dec and Dem.
+#
+# sex:
+# p = 0.365
+# No significant overall difference between females and males.
+#
+# Overall model:
+# p = 0.511
+# R² = 0.042
+#
+# Biological conclusion:
+# Input rate is not significantly explained by bodyweight,
+# species, or sex.
+
+#### 4. Interaction model: species * bodysize ####
+# Do species differ in input depending on body size?
+
+
+model_interaction <- lm(input_g_hr ~ lab_weight * species,
+                        data = input_bw_data)
+
+summary(model_interaction)
+anova(model_interaction)
+
+#### 5. Interaction model: species × sex ####
+#
+# This tests whether the species difference depends on sex.
+#
+# In other words:
+# Are Dec and Dem different in females, but not in males?
+
+model_interaction <- lm(input_g_hr ~ lab_weight + species * sex,
+                        data = input_bw_data)
+
+summary(model_interaction)
+anova(model_interaction)
+
+# Interpretation based on your results:
+#
+# species:sex interaction:
+# p = 0.611
+#
+# This is not significant.
+#
+# Therefore, there is no strong statistical evidence that the
+# species effect differs between females and males.
+#
+# Important:
+# Because this interaction is not significant, any female-only
+# species difference must be interpreted cautiously.
+
+
+#### 6. Exploratory within-sex Wilcoxon tests ####
+# Why this test?
+#
+# These tests compare Dec vs Dem separately within each sex.
+#
+# They are useful as exploratory follow-up tests, but they should not
+# be treated as the main result because the species × sex interaction
+# was not significant.
+
+wilcox_female <- wilcox.test(input_g_hr ~ species,
+                             data = filter(input_bw_data, sex == "female"))
+
+wilcox_male <- wilcox.test(input_g_hr ~ species,
+                           data = filter(input_bw_data, sex == "male"))
+
+wilcox_female
+wilcox_male
+
+# Interpretation based on your results:
+#
+# Females:
+# p = 0.030
+# Female Dec and Dem differ in input rate in this exploratory test.
+#
+# Males:
+# p = 0.403
+# Male Dec and Dem do not significantly differ.
+#
+# Important caution:
+# The species × sex interaction was not significant in the linear model.
+# Therefore, the female-only Wilcoxon result should be described as
+# exploratory, not as strong evidence for a sex-specific species effect.
+
+
+#### 7. Optional plot: species comparison within each sex ####
+# This plot directly shows the exploratory within-sex comparison.
+
+plot_species_by_sex <- ggplot(input_bw_data,
+                              aes(x = species,
+                                  y = input_g_hr,
+                                  color = species)) +
   
-  geom_jitter(width = 0.1, alpha = 0.8) +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.85) +
   
   facet_wrap(~sex) +
   
   scale_color_manual(
-    values = c("Dec" = cols_all[9],
-               "Dem" = cols_all[12]),
-    guide = "none"   #
+    values = c(
+      "Dec" = cols_all[7],
+      "Dem" = cols_all[8]
+    ),
+    guide = "none"
   ) +
   
   labs(
-    x = "Species",          
-    y = "Input (g/hr)"
+    x = "Species",
+    y = "Input rate (g/hr)"
   ) +
   
   theme_classic()
 
-lm_female <- lm(input_g_hr ~ lab_weight * species,
-                data = filter(input_bw_data, sex == "female"))
+plot_species_by_sex
 
-summary(lm_female)
-
-#Call:
-#  lm(formula = input_g_hr ~ lab_weight * species, data = filter(input_bw_data, sex == "female"))
-
-#Residuals:
-#  Min        1Q    Median        3Q       Max 
-#-0.031791 -0.015241 -0.005519  0.009121  0.098896 
-
-#Coefficients:
-#  Estimate Std. Error t value Pr(>|t|)  
-#(Intercept)            0.14762    0.06008   2.457   0.0202 *
-# lab_weight            -0.17949    0.08757  -2.050   0.0495 *
-# speciesDem            -0.11014    0.06896  -1.597   0.1211  
-# lab_weight:speciesDem  0.18019    0.09277   1.942   0.0619 .
-#---
-#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-#Residual standard error: 0.02595 on 29 degrees of freedom
-#Multiple R-squared:  0.1779,	Adjusted R-squared:  0.09287 
-#F-statistic: 2.092 on 3 and 29 DF,  p-value: 0.123
-
-#>In females, larger individuals have LOWER input rates (g/hr)
-#>The relationship between bodyweight and input differs between species
-#>Dec negative slope, dem has flat slope 
-
-ggplot(filter(input_bw_data, sex == "female"),
-       aes(x = lab_weight, y = input_g_hr, color = species)) +
-  
-  geom_point(size = 3, alpha = 0.85) +
-  
-  geom_smooth(method = "lm", se = FALSE) +
-  
-  scale_color_manual(
-    values = c("Dec" = cols_all[9],
-               "Dem" = cols_all[12])
-  ) +
-  
-  theme_classic()
+#### Final interpretation: ####
+#
+# Bodyweight did not significantly explain input rate.
+# Dec and Dem did not differ significantly in input rate after accounting
+# for bodyweight.
+# Sex also did not significantly explain input rate.
+# The species × sex interaction was not significant, meaning there is no
+# strong evidence that species differences depend on sex.
+#
+# Exploratory Wilcoxon tests showed a significant Dec vs Dem difference
+# within females, but not within males. However, because the interaction
+# model was not significant, this female-only pattern should be interpreted
+# cautiously.
+#
+# Overall conclusion:
+# Input rate does not appear to be driven by bodyweight differences between
+# Dec and Dem.
