@@ -1150,7 +1150,140 @@ fig_weight_stacked
  
  fig_bw_loss
 
- #### Stats ####
+#### combining control and percent ####
+ 
+ library(dplyr)
+ library(ggplot2)
+ library(patchwork)
+ 
+ cols_all <- palette.colors(12, palette = "Paired")
+ 
+ # Choose what to include:
+ # Option 1: females only
+ plot_cas_control_use <- plot_cas_control %>%
+   filter(sex == "female")
+ 
+ cas_control_use <- cas_control %>%
+   filter(sex == "female")
+ 
+ # Option 2: female + male combined
+ # plot_cas_control_use <- plot_cas_control
+ # cas_control_use <- cas_control
+ 
+ 
+##Calculate bodyweight loss ##
+ 
+ bw_loss <- cas_control_use %>%
+   filter(action %in% c("lab", "bodyweight")) %>%
+   filter(!is.na(weight)) %>%
+   arrange(number, event) %>%
+   group_by(number, species, sex) %>%
+   summarise(
+     weight_start = first(weight),
+     weight_end   = last(weight),
+     .groups = "drop"
+   ) %>%
+   mutate(
+     loss_g = weight_start - weight_end,
+     loss_percent = (loss_g / weight_start) * 100
+   )
+ 
+ 
+## A) Bodyweight over time ##
+ 
+ fig_weight_time_C <- ggplot() +
+   
+   geom_rect(
+     data = time_blocks,
+     aes(
+       xmin = xmin,
+       xmax = xmax,
+       ymin = ymin,
+       ymax = ymax,
+       fill = period
+     ),
+     alpha = 0.2,
+     inherit.aes = FALSE,
+     show.legend = FALSE
+   ) +
+   
+   geom_line(
+     data = plot_cas_control_use,
+     aes(
+       x = time_h,
+       y = weight,
+       group = number
+     ),
+     linewidth = 0.5,
+     alpha = 0.7,
+     color = "grey35"
+   ) +
+   
+   geom_point(
+     data = plot_cas_control_use,
+     aes(
+       x = time_h,
+       y = weight
+     ),
+     size = 2.8,
+     alpha = 0.9,
+     color = cols_all[9],
+     shape = 15
+   ) +
+   
+   scale_fill_manual(values = bg_cols) +
+   
+   scale_y_continuous(
+     labels = function(x) sprintf("%.3f", x)
+   ) +
+   
+   scale_x_continuous(
+     breaks = seq(8, 18, by = 2),
+     labels = function(x) sprintf("%02d:00", x)
+   ) +
+   
+   labs(
+     x = "Time of day",
+     y = "Bodyweight (g)"
+   ) +
+   
+   theme_classic()
+ 
+ 
+## B) Percent bodyweight loss ##
+ 
+ fig_bw_loss <- ggplot(
+   bw_loss,
+   aes(x = "", y = loss_percent)
+ ) +
+   geom_boxplot(
+     width = 0.35,
+     alpha = 0.2,
+     outlier.shape = NA,
+     color = "black"
+   ) +
+   geom_jitter(
+     width = 0.08,
+     size = 3,
+     alpha = 0.9,
+     color = cols_all[9],
+     shape = 15
+   ) +
+   labs(
+     x = NULL,
+     y = "Bodyweight loss (%)"
+   ) +
+   theme_classic()
+ 
+ 
+## Combined figure ##
+ 
+ fig_control_combined <- fig_weight_time_C + fig_bw_loss +
+   plot_annotation(tag_levels = "A")
+ 
+ fig_control_combined
+
+#### Stats ####
  ## 1. Does bodyweight loss differ from 0?
  
  wilcox.test(bw_loss$loss_percent, mu = 0)
@@ -1242,7 +1375,7 @@ fig_weight_stacked
  # reach statistical significance.
  # Report this together with the p-value if relevant.
  
- #### Overall feedback####
+#### Overall feedback####
  
  ### Overall bodyweight loss
  

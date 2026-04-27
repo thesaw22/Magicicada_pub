@@ -1628,16 +1628,8 @@ plot_data_pos %>%
 model <- lm(input_g_hr ~ species * time_window, data = plot_data_pos)
 anova(model)
 
-# Interpretation of ANOVA:
-# species: p = 0.144
-# → No significant overall difference between Dec and Dem
-#
-# time_window: p = 0.111
-#
-# species:time_window: p = 0.95
-# → No interaction
-# → The time pattern does not differ between species
-
+#No evidence that overall input differs between species
+#No strong evidence that input changes across time of day
 
 ## 3. Model summary
 
@@ -1680,9 +1672,9 @@ library(effectsize)
 eta_squared(model)
 
 # Interpretation:
-# species ≈ 0.029  -> small effect
-# time_window ≈ 0.121 -> moderate effect
-# interaction ≈ 0.008 -> negligible effect
+# species ≈ 0.05  -> small effect
+# time_window ≈ 0.13 -> moderate effect
+# interaction ≈ 0.0-e -> negligible effect
 #
 # → Time explains more variation than species
 # → Species contributes little to variation in positive input rates
@@ -1703,33 +1695,7 @@ kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
 # It does NOT tell us which time windows differ from each other.
 
 
-## 7. Dunn post-hoc test
-
-# FSA::dunnTest() can fail when the data object is a tibble
-# or when factor handling is not clean.
-# So we create a plain data.frame and make sure time_window is a factor.
-
-library(FSA)
-
-dunn_data <- plot_data_pos %>%
-  select(input_g_hr, time_window) %>%
-  filter(!is.na(input_g_hr), !is.na(time_window)) %>%
-  mutate(time_window = factor(time_window)) %>%
-  as.data.frame()
-
-FSA::dunnTest(input_g_hr ~ time_window, data = dunn_data, method = "bh")
-
-#_> still error
-# Interpretation:
-# This post-hoc test will tell you WHICH time windows differ.
-# Use these pairwise adjusted p-values to identify where the significant differences lie.
-#
-# Likely expectation from your summaries:
-# → Night will differ from Morning and probably from Evening
-# → Afternoon may be intermediate
-
-
-## 8. Alternative if FSA still errors
+## 7. Alternative if FSA still errors
 
 # A very robust alternative is rstatix::dunn_test()
 
