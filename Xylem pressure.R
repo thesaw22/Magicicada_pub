@@ -118,8 +118,8 @@ ggplot(pressure_summary_all,
 paired <- palette.colors(12, "Paired")
 
 bg_cols <- c(
-  "morning" = paired[7],
-  "afternoon" = paired[5],
+  "morning" = paired[5],
+  "afternoon" = paired[9],
   "evening" = paired[3],
   "night" = paired[1]
 )
@@ -203,86 +203,28 @@ library(readr)
 write_csv(pressure_stats_combined,
           "~/Desktop/Cicada/Tennessee R/CicTen/pressure_stats_combined.csv")
 
-#### creating A) and B) for DecDem and Cas timewindows ####
-
-pressure_summary_all <- pressure_tidy %>%
-  group_by(time) %>%
-  summarise(
-    mean_pressure = mean(pressure, na.rm = TRUE),
-    min_pressure = min(pressure, na.rm = TRUE),
-    max_pressure = max(pressure, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(time_posix = as.POSIXct(time, format = "%H:%M"))
-
-# Duplicate same pressure data for panels A and B
-
-pressure_summary_panels <- bind_rows(
-  pressure_summary_all %>% mutate(panel = "M. decula and decim"),
-  pressure_summary_all %>% mutate(panel = "M. cassini")
-) %>%
-  mutate(panel = factor(panel, levels = c("M. decula and decim", "M. cassini")))
-
-time_blocks_all <- bind_rows(time_blocks_A, time_blocks_B) %>%
-  mutate(panel = factor(panel, levels = c("M. decula and decim", "M. cassini")))
-
-ggplot() +
-  geom_rect(
-    data = time_blocks_all,
-    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = period),
-    alpha = 0.2,
-    inherit.aes = FALSE,
-    show.legend = FALSE
-  ) +
-  
-  geom_line(
-    data = pressure_summary_panels,
-    aes(x = time_posix, y = mean_pressure),
-    linewidth = 1,
-    color = "black"
-  ) +
-  
-  geom_point(
-    data = pressure_summary_panels,
-    aes(x = time_posix, y = mean_pressure),
-    color = "black"
-  ) +
-  
-  geom_errorbar(
-    data = pressure_summary_panels,
-    aes(x = time_posix, ymin = min_pressure, ymax = max_pressure),
-    width = 0.05,
-    color = "black"
-  ) +
-  
-  facet_wrap(~panel, ncol = 1) +
-  
-  scale_x_datetime(
-    date_breaks = "2 hours",
-    date_labels = "%H:%M"
-  ) +
-  
-  scale_y_reverse(
-    breaks = seq(0, -20, by = -2)
-  ) +
-  
-  scale_fill_manual(values = bg_cols) +
-  
-  labs(
-    x = "Time",
-    y = "Xylem Pressure (bar)"
-  ) +
-  
-  theme_minimal() +
-  theme(
-    strip.text = element_text(face = "bold", size = 12)
-  )
 
 #### labels as A and B and to the left for paper ####
 
 library(ggplot2)
 library(dplyr)
 library(patchwork)
+
+# Color theme
+cols_all <- palette.colors(12, palette = "Paired")
+
+bg_cols <- c(
+  "morning" = cols_all[5],
+  "noon"    = cols_all[9],
+  "evening" = cols_all[3],
+  "night"   = cols_all[1]
+)
+
+# Re-create time_posix safely
+pressure_summary_all <- pressure_summary_all %>%
+  mutate(
+    time_posix = as.POSIXct(time, format = "%H:%M")
+  )
 
 # Background windows for A
 time_blocks_A <- data.frame(
@@ -294,7 +236,6 @@ time_blocks_A <- data.frame(
 )
 
 # Background windows for B
-
 time_blocks_B <- data.frame(
   period = c("morning", "noon", "evening"),
   xmin = as.POSIXct(c("08:00", "12:00", "18:00"), format = "%H:%M"),
@@ -303,101 +244,67 @@ time_blocks_B <- data.frame(
   ymax = Inf
 )
 
-# Plot A
+make_pressure_plot <- function(blocks, panel_label, x_label = NULL) {
+  
+  ggplot() +
+    geom_rect(
+      data = blocks,
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = period),
+      alpha = 0.25,          # ← ADD THIS (main fix)
+      color = NA,            # ← ensure no borders at all
+      inherit.aes = FALSE,
+      show.legend = FALSE
+    )+
+    geom_line(
+      data = pressure_summary_all,
+      aes(x = time_posix, y = mean_pressure),
+      linewidth = 1,
+      color = "black"
+    ) +
+    geom_point(
+      data = pressure_summary_all,
+      aes(x = time_posix, y = mean_pressure),
+      size = 2.5,
+      color = "black"
+    ) +
+    geom_errorbar(
+      data = pressure_summary_all,
+      aes(x = time_posix, ymin = min_pressure, ymax = max_pressure),
+      width = 0.05,
+      color = "black",
+      linewidth = 0.5
+    ) +
+    scale_x_datetime(
+      date_breaks = "2 hours",
+      date_labels = "%H:%M",
+      limits = as.POSIXct(c("05:00", "21:00"), format = "%H:%M"),
+      expand = c(0, 0)
+    ) +
+    scale_y_reverse(
+      breaks = seq(0, -20, by = -2)
+    ) +
+    scale_fill_manual(values = bg_cols) +
+    labs(
+      title = panel_label,
+      x = x_label,
+      y = "Xylem Pressure (bar)"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", hjust = 0),
+      plot.title.position = "plot",
+      panel.grid.minor = element_blank(),
+      axis.text = element_text(color = "black"),
+      axis.title = element_text(color = "black")
+    )
+}
 
-pA <- ggplot() +
-  geom_rect(
-    data = time_blocks_A,
-    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = period),
-    alpha = 0.2,
-    inherit.aes = FALSE,
-    show.legend = FALSE
-  ) +
-  geom_line(
-    data = pressure_summary_all,
-    aes(x = time_posix, y = mean_pressure),
-    linewidth = 1,
-    color = "black"
-  ) +
-  geom_point(
-    data = pressure_summary_all,
-    aes(x = time_posix, y = mean_pressure),
-    color = "black"
-  ) +
-  geom_errorbar(
-    data = pressure_summary_all,
-    aes(x = time_posix, ymin = min_pressure, ymax = max_pressure),
-    width = 0.05,
-    color = "black"
-  ) +
-  scale_x_datetime(
-    date_breaks = "2 hours",
-    date_labels = "%H:%M",
-    limits = as.POSIXct(c("05:00", "21:00"), format = "%H:%M")
-  ) +
-  scale_y_reverse(
-    breaks = seq(0, -20, by = -2)
-  ) +
-  scale_fill_manual(values = bg_cols) +
-  labs(
-    title = "A",
-    x = NULL,
-    y = "Xylem Pressure (bar)"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold", hjust = 0),
-    plot.title.position = "plot"
-  )
+pA <- make_pressure_plot(time_blocks_A, "A", x_label = NULL)
+pB <- make_pressure_plot(time_blocks_B, "B", x_label = "Time")
 
-# Plot B
+pA
 
-pB <- ggplot() +
-  geom_rect(
-    data = time_blocks_B,
-    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = period),
-    alpha = 0.2,
-    inherit.aes = FALSE,
-    show.legend = FALSE
-  ) +
-  geom_line(
-    data = pressure_summary_all,
-    aes(x = time_posix, y = mean_pressure),
-    linewidth = 1,
-    color = "black"
-  ) +
-  geom_point(
-    data = pressure_summary_all,
-    aes(x = time_posix, y = mean_pressure),
-    color = "black"
-  ) +
-  geom_errorbar(
-    data = pressure_summary_all,
-    aes(x = time_posix, ymin = min_pressure, ymax = max_pressure),
-    width = 0.05,
-    color = "black"
-  ) +
-  scale_x_datetime(
-    date_breaks = "2 hours",
-    date_labels = "%H:%M",
-    limits = as.POSIXct(c("05:00", "21:00"), format = "%H:%M")
-  ) +
-  scale_y_reverse(
-    breaks = seq(0, -20, by = -2)
-  ) +
-  scale_fill_manual(values = bg_cols) +
-  labs(
-    title = "B",
-    x = "Time",
-    y = "Xylem Pressure (bar)"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold", hjust = 0),
-    plot.title.position = "plot"
-  )
-
-# Combine vertically
+pB
 
 pA / pB
 
