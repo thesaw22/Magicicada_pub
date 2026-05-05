@@ -355,6 +355,11 @@ time_blocks_combined <- bind_rows(
       levels = c("Morning", "Afternoon", "Evening", "Night")
     ),
     
+    label = case_when(
+      species_group == "Cas" & time_window == "Evening" ~ "Eve",
+      TRUE ~ as.character(time_window)
+    ),
+    
     ymin = case_when(
       species_group == "Dec + Dem" ~ -1.98,
       species_group == "Cas"       ~ -1.84
@@ -372,7 +377,6 @@ time_blocks_combined <- bind_rows(
 # Plot
 p_xylem <- ggplot() +
   
-  # Time blocks
   geom_rect(
     data = time_blocks_combined,
     aes(
@@ -387,14 +391,12 @@ p_xylem <- ggplot() +
     alpha = 0.55
   ) +
   
-  # Labels inside blocks
   geom_text(
     data = time_blocks_combined,
-    aes(x = x_label, y = y_label, label = time_window),
+    aes(x = x_label, y = y_label, label = label),
     size = 3
   ) +
   
-  # Xylem pressure
   geom_line(
     data = pressure_summary_all_mpa,
     aes(x = time_posix, y = mean_pressure_mpa),
@@ -420,7 +422,6 @@ p_xylem <- ggplot() +
     color = "black"
   ) +
   
-  # Species labels OUTSIDE plot
   annotate(
     "text",
     x = as.POSIXct("21:20", format = "%H:%M"),
@@ -439,7 +440,6 @@ p_xylem <- ggplot() +
     size = 3.5
   ) +
   
-  # Axes
   scale_x_datetime(
     date_breaks = "2 hours",
     date_labels = "%H:%M"
@@ -449,7 +449,6 @@ p_xylem <- ggplot() +
     breaks = seq(0, -2.0, by = -0.2)
   ) +
   
-  # Zoom without removing annotations
   coord_cartesian(
     xlim = as.POSIXct(c("05:00", "21:00"), format = "%H:%M"),
     ylim = c(0, -2.0),
@@ -466,10 +465,535 @@ p_xylem <- ggplot() +
     y = "Xylem Pressure (MPa)"
   ) +
   
-  theme_minimal() +
+  theme_classic(base_size = 14) +
   theme(
     legend.position = "none",
+    panel.border = element_blank(),
     plot.margin = margin(5.5, 90, 5.5, 5.5)
   )
 
 p_xylem
+
+#### Putiing it into 24h to match temperature ####
+
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+
+# Color theme
+cols_all <- palette.colors(12, palette = "Paired")
+
+bg_cols <- c(
+  "Morning"   = cols_all[5],
+  "Afternoon" = cols_all[9],
+  "Evening"   = cols_all[3],
+  "Night"     = cols_all[1]
+)
+
+# Dummy date for 24 h axis
+dummy_date <- "2000-01-01"
+
+# Convert pressure from bar → MPa
+pressure_summary_all_mpa <- pressure_summary_all %>%
+  mutate(
+    mean_pressure_mpa = mean_pressure * 0.1,
+    min_pressure_mpa  = min_pressure * 0.1,
+    max_pressure_mpa  = max_pressure * 0.1,
+    
+    time_only = format(time_posix, "%H:%M"),
+    time_posix_24h = as.POSIXct(
+      paste(dummy_date, time_only),
+      format = "%Y-%m-%d %H:%M"
+    )
+  )
+
+# Time blocks A: Dec + Dem
+time_blocks_A <- data.frame(
+  time_window = c("Night", "Morning", "Afternoon", "Evening", "Night"),
+  xmin = as.POSIXct(
+    paste(dummy_date, c("00:00", "07:00", "10:00", "17:00", "20:00")),
+    format = "%Y-%m-%d %H:%M"
+  ),
+  xmax = as.POSIXct(
+    c(
+      paste(dummy_date, c("07:00", "10:00", "17:00", "20:00")),
+      paste("2000-01-02", "00:00")
+    ),
+    format = "%Y-%m-%d %H:%M"
+  )
+)
+
+# Time blocks B: Cas
+time_blocks_B <- data.frame(
+  time_window = c("Morning", "Afternoon", "Evening"),
+  xmin = as.POSIXct(
+    paste(dummy_date, c("08:00", "12:00", "18:00")),
+    format = "%Y-%m-%d %H:%M"
+  ),
+  xmax = as.POSIXct(
+    paste(dummy_date, c("11:00", "17:00", "20:00")),
+    format = "%Y-%m-%d %H:%M"
+  )
+)
+
+# Combine blocks
+time_blocks_combined <- bind_rows(
+  time_blocks_A %>% mutate(species_group = "Dec + Dem"),
+  time_blocks_B %>% mutate(species_group = "Cas")
+) %>%
+  mutate(
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    
+    label = case_when(
+      species_group == "Cas" & time_window == "Evening" ~ "Eve",
+      TRUE ~ as.character(time_window)
+    ),
+    
+    ymin = case_when(
+      species_group == "Dec + Dem" ~ -2.05,
+      species_group == "Cas"       ~ -1.83
+    ),
+    
+    ymax = case_when(
+      species_group == "Dec + Dem" ~ -1.85,
+      species_group == "Cas"       ~ -1.68
+    ),
+    
+    y_label = (ymin + ymax) / 2,
+    x_label = xmin + (xmax - xmin) / 2
+  )
+
+# Plot
+p_xylem_24h <- ggplot() +
+  
+  geom_rect(
+    data = time_blocks_combined,
+    aes(
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax,
+      fill = time_window
+    ),
+    color = "black",
+    linewidth = 0.4,
+    alpha = 0.55
+  ) +
+  
+  geom_text(
+    data = time_blocks_combined,
+    aes(x = x_label, y = y_label, label = label),
+    size = 3
+  ) +
+  
+  geom_line(
+    data = pressure_summary_all_mpa,
+    aes(x = time_posix_24h, y = mean_pressure_mpa),
+    linewidth = 1,
+    color = "black"
+  ) +
+  
+  geom_point(
+    data = pressure_summary_all_mpa,
+    aes(x = time_posix_24h, y = mean_pressure_mpa),
+    size = 2,
+    color = "black"
+  ) +
+  
+  geom_errorbar(
+    data = pressure_summary_all_mpa,
+    aes(
+      x = time_posix_24h,
+      ymin = min_pressure_mpa,
+      ymax = max_pressure_mpa
+    ),
+    width = 20 * 60,
+    color = "black"
+  ) +
+  
+  annotate(
+    "text",
+    x = as.POSIXct(paste("2000-01-02", "00:20"), format = "%Y-%m-%d %H:%M"),
+    y = -1.925,
+    label = "Dec + Dem",
+    hjust = 0,
+    size = 3.5
+  ) +
+  
+  annotate(
+    "text",
+    x = as.POSIXct(paste("2000-01-02", "00:20"), format = "%Y-%m-%d %H:%M"),
+    y = -1.785,
+    label = "Cas",
+    hjust = 0,
+    size = 3.5
+  ) +
+  
+  scale_x_datetime(
+    date_breaks = "2 hours",
+    date_labels = "%H:%M",
+    limits = as.POSIXct(
+      c(
+        paste(dummy_date, "00:00"),
+        paste("2000-01-02", "01:00")
+      ),
+      format = "%Y-%m-%d %H:%M"
+    ),
+    expand = c(0, 0)
+  ) +
+  
+  scale_y_reverse(
+    breaks = seq(0, -2.0, by = -0.2)
+  ) +
+  
+  coord_cartesian(
+    ylim = c(0, -2.0),
+    clip = "off"
+  ) +
+  
+  scale_fill_manual(
+    values = bg_cols,
+    drop = FALSE
+  ) +
+  
+  labs(
+    x = "Time of day",
+    y = "Xylem Pressure (MPa)"
+  ) +
+  
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    
+    panel.border = element_blank(),
+    axis.line = element_line(color = "black"),
+    
+    panel.grid = element_blank(),   # ← removes all grid lines
+    
+    plot.margin = margin(5.5, 90, 5.5, 5.5)
+  )
+
+p_xylem_24h
+####___________________________________________________________####
+#### Temperature data ####
+
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(readr)
+
+# Load data 
+
+weather_data <- read_delim(
+  "data/Weather data.csv",
+  delim = ";",
+  escape_double = FALSE,
+  col_types = cols(
+    `Wireless ET Station: B: Temperature` = col_number()
+  ),
+  locale = locale(decimal_mark = ","),
+  trim_ws = TRUE
+)
+
+# Rename, convert Fahrenheit to Celsius, filter dates 
+
+weather_data <- weather_data %>%
+  rename(
+    datetime = Timestamp,
+    temperature_F = `Wireless ET Station: B: Temperature`
+  ) %>%
+  mutate(
+    datetime = dmy_hm(datetime),
+    temperature_C = (temperature_F - 32) * 5 / 9
+  ) %>%
+  filter(
+    datetime >= as.POSIXct("2025-05-20 00:00"),
+    datetime <  as.POSIXct("2025-05-23 00:00")
+  )
+
+# Color theme 
+
+cols_all <- palette.colors(12, palette = "Paired")
+
+bg_cols <- c(
+  "Morning"   = cols_all[5],
+  "Afternoon" = cols_all[9],
+  "Evening"   = cols_all[3],
+  "Night"     = cols_all[1]
+)
+
+# Collapse all dates onto one 24 h day 
+
+dummy_date <- "2000-01-01"
+
+temperature_summary <- weather_data %>%
+  filter(!is.na(datetime), !is.na(temperature_C)) %>%
+  mutate(
+    hour_only = floor_date(datetime, unit = "hour"),
+    time_only = format(hour_only, "%H:00"),
+    time_posix = as.POSIXct(
+      paste(dummy_date, time_only),
+      format = "%Y-%m-%d %H:%M"
+    )
+  ) %>%
+  group_by(time_posix) %>%
+  summarise(
+    mean_temperature = mean(temperature_C, na.rm = TRUE),
+    min_temperature  = min(temperature_C, na.rm = TRUE),
+    max_temperature  = max(temperature_C, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+# Time blocks
+# Dec + Dem: full 24 h with Night split
+# Cas: only its active time windows
+
+time_blocks_A <- data.frame(
+  time_window = c("Night", "Morning", "Afternoon", "Evening", "Night"),
+  xmin = as.POSIXct(
+    paste(dummy_date, c("00:00", "08:00", "12:00", "17:00", "20:00")),
+    format = "%Y-%m-%d %H:%M"
+  ),
+  xmax = as.POSIXct(
+    c(
+      paste(dummy_date, c("08:00", "12:00", "17:00", "20:00")),
+      paste("2000-01-02", "00:00")
+    ),
+    format = "%Y-%m-%d %H:%M"
+  )
+)
+
+time_blocks_B <- data.frame(
+  time_window = c("Morning", "Afternoon", "Evening"),
+  xmin = as.POSIXct(
+    paste(dummy_date, c("08:00", "12:00", "18:00")),
+    format = "%Y-%m-%d %H:%M"
+  ),
+  xmax = as.POSIXct(
+    paste(dummy_date, c("11:00", "17:00", "20:00")),
+    format = "%Y-%m-%d %H:%M"
+  )
+)
+
+# Combine two block rows 
+
+y_min_plot <- min(temperature_summary$min_temperature, na.rm = TRUE)
+
+time_blocks_combined <- bind_rows(
+  time_blocks_A %>% mutate(species_group = "Dec + Dem"),
+  time_blocks_B %>% mutate(species_group = "Cas")
+) %>%
+  mutate(
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    
+    ymin = case_when(
+      species_group == "Dec + Dem" ~ y_min_plot - 5.2,
+      species_group == "Cas"       ~ y_min_plot - 3.0
+    ),
+    
+    ymax = case_when(
+      species_group == "Dec + Dem" ~ y_min_plot - 3.6,
+      species_group == "Cas"       ~ y_min_plot - 1.4
+    ),
+    
+    y_label = (ymin + ymax) / 2,
+    x_label = xmin + (xmax - xmin) / 2
+  )
+
+# Plot 
+
+temperature_plot <- ggplot() +
+  
+  # Time blocks
+  geom_rect(
+    data = time_blocks_combined,
+    aes(
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax,
+      fill = time_window
+    ),
+    color = "black",
+    linewidth = 0.4,
+    alpha = 0.55
+  ) +
+  
+  # Labels inside blocks
+  geom_text(
+    data = time_blocks_combined,
+    aes(
+      x = x_label,
+      y = y_label,
+      label = time_window
+    ),
+    size = 3
+  ) +
+  
+  # Temperature line
+  geom_line(
+    data = temperature_summary,
+    aes(x = time_posix, y = mean_temperature),
+    linewidth = 1,
+    color = "black"
+  ) +
+  
+  geom_point(
+    data = temperature_summary,
+    aes(x = time_posix, y = mean_temperature),
+    size = 2.3,
+    color = "black"
+  ) +
+  
+  # Hourly min/max error bars
+  geom_errorbar(
+    data = temperature_summary,
+    aes(
+      x = time_posix,
+      ymin = min_temperature,
+      ymax = max_temperature
+    ),
+    width = 20 * 60,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  # Species labels outside plot
+  annotate(
+    "text",
+    x = as.POSIXct(paste("2000-01-02", "00:20"), format = "%Y-%m-%d %H:%M"),
+    y = y_min_plot - 4.4,
+    label = "Dec + Dem",
+    hjust = 0,
+    size = 3.5
+  ) +
+  
+  annotate(
+    "text",
+    x = as.POSIXct(paste("2000-01-02", "00:20"), format = "%Y-%m-%d %H:%M"),
+    y = y_min_plot - 2.2,
+    label = "Cas",
+    hjust = 0,
+    size = 3.5
+  ) +
+  
+  scale_fill_manual(values = bg_cols) +
+  
+  scale_x_datetime(
+    date_breaks = "2 hours",
+    date_labels = "%H:%M",
+    limits = as.POSIXct(
+      c(
+        paste(dummy_date, "00:00"),
+        paste("2000-01-02", "01:00")
+      ),
+      format = "%Y-%m-%d %H:%M"
+    ),
+    expand = c(0, 0)
+  ) +
+  
+  labs(
+    x = "Time of day",
+    y = "Temperature (°C)"
+  ) +
+  
+  coord_cartesian(clip = "off") +
+  
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    
+    panel.border = element_blank(),
+    axis.line = element_line(color = "black"),
+    
+    panel.grid = element_blank(),   # ← removes all grid lines
+    
+    plot.margin = margin(5.5, 90, 5.5, 5.5)
+  )
+
+temperature_plot
+
+#### without block for combination ####
+
+temperature_plot_no_blocks <- ggplot() +
+  
+  geom_line(
+    data = temperature_summary,
+    aes(x = time_posix, y = mean_temperature),
+    linewidth = 1,
+    color = "black"
+  ) +
+  
+  geom_point(
+    data = temperature_summary,
+    aes(x = time_posix, y = mean_temperature),
+    size = 2.3,
+    color = "black"
+  ) +
+  
+  geom_errorbar(
+    data = temperature_summary,
+    aes(
+      x = time_posix,
+      ymin = min_temperature,
+      ymax = max_temperature
+    ),
+    width = 20 * 60,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  scale_x_datetime(
+    date_breaks = "2 hours",
+    date_labels = "%H:%M",
+    limits = as.POSIXct(
+      c(
+        paste(dummy_date, "00:00"),
+        paste("2000-01-02", "01:00")
+      ),
+      format = "%Y-%m-%d %H:%M"
+    ),
+    expand = c(0, 0)
+  ) +
+  
+  labs(
+    x = NULL,
+    y = "Temperature (°C)"
+  ) +
+  
+  coord_cartesian(clip = "off") +
+  
+  theme_classic(base_size = 14) +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.border = element_blank()
+  )
+
+temperature_plot_no_blocks
+####____________________________________________________________####
+#### Combining Xylem pressure and Temperature into AB ####
+
+library(patchwork)
+
+
+combined_temp_xylem <- temperature_plot_no_blocks / p_xylem_24h +
+  plot_layout(heights = c(1, 1.15)) +
+  plot_annotation(tag_levels = "A") &
+  theme(
+    plot.tag = element_text(size = 16, face = "bold")
+  )
+
+combined_temp_xylem
+
+
+    
