@@ -1350,3 +1350,480 @@ species_tests_pos <- plot_data_pos %>%
 
 species_tests_pos
 #--------------------------------------------------------------------------------
+#### (g/hr)/ bodyweight ####
+#Uses corrected input_hr from Input.csv and lab_weight = weight_1 
+
+input_clean <- Input %>%
+  clean_names() %>%
+  select(-starts_with("unnamed")) %>%
+  mutate(
+    across(where(is.character), str_squish),
+    across(where(is.character), ~ na_if(., "")),
+    
+    number = parse_number(as.character(number)),
+    
+    purpose = str_squish(purpose),
+    species = str_squish(species),
+    sex = str_to_lower(str_squish(sex)),
+    
+    lab_weight = as.numeric(str_replace(as.character(weight_1), ",", ".")),
+    input_hr = as.numeric(str_replace(as.character(input_hr), ",", ".")),
+    
+    time_window = case_when(
+      str_to_lower(time_slot_of_third_action) == "morning" ~ "Morning",
+      str_to_lower(time_slot_of_third_action) == "noon" ~ "Afternoon",
+      str_to_lower(time_slot_of_third_action) == "afternoon" ~ "Afternoon",
+      str_to_lower(time_slot_of_third_action) == "evening" ~ "Evening",
+      str_to_lower(time_slot_of_third_action) == "night" ~ "Night",
+      TRUE ~ NA_character_
+    ),
+    
+    time_window = factor(
+      time_window,
+      levels = c("Morning", "Afternoon", "Evening", "Night")
+    ),
+    
+    species = factor(species, levels = c("Dec", "Dem", "Cas"))
+  ) %>%
+  filter(
+    purpose == "Excretion",
+    species %in% c("Dec", "Dem"),
+    !number %in% remove_ids,
+    !is.na(time_window)
+  ) %>%
+  droplevels()
+
+plot_data_pos_bw <- input_clean %>%
+  filter(
+    !is.na(input_hr),
+    input_hr > 0,
+    !is.na(lab_weight),
+    lab_weight > 0,
+    !is.na(time_window)
+  ) %>%
+  mutate(
+    input_hr_bw = input_hr / lab_weight,
+    species = factor(species, levels = c("Dec", "Dem"))
+  )
+
+#### figure: Dec and Dem violin plot and separated ####
+
+fig2_pos_bw <- ggplot(plot_data_pos_bw, aes(x = time_window, y = input_hr_bw)) +
+  
+  geom_violin(
+    aes(fill = time_window),
+    alpha = 0.5,
+    color = NA,
+    trim = FALSE
+  ) +
+  
+  geom_point(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      color = time_window,
+      shape = species
+    ),
+    size = 2.8,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      group = interaction(time_window, species)
+    ),
+    fun = mean,
+    geom = "point",
+    size = 3.5,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      group = interaction(time_window, species)
+    ),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.05,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  scale_color_manual(values = time_point_cols, drop = FALSE) +
+  scale_fill_manual(values = time_fill_cols, drop = FALSE) +
+  scale_shape_manual(values = c("Dec" = 16, "Dem" = 17)) +
+  
+  labs(
+    x = "Time window",
+    y = "Bodyweight-normalized input rate ((g/hr)/g)",
+    shape = "Species"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none",
+    shape = guide_legend(title = "Species")
+  ) +
+  
+  theme_classic() +
+  theme(
+    legend.position = c(1, 1),
+    legend.justification = c(1, 1),
+    legend.background = element_blank()
+  )
+
+fig2_pos_bw
+
+#### testing sig. between species in time window ####
+fig2_pos_bw_species_sig <- ggplot(plot_data_pos_bw, aes(x = time_window, y = input_hr_bw)) +
+  
+  geom_violin(
+    aes(fill = time_window),
+    alpha = 0.5,
+    color = NA,
+    trim = FALSE
+  ) +
+  
+  geom_point(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      color = time_window,
+      shape = species
+    ),
+    size = 2.8,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      group = interaction(time_window, species)
+    ),
+    fun = mean,
+    geom = "point",
+    size = 3.5,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(
+      x = as.numeric(time_window) + ifelse(species == "Dec", -0.12, 0.12),
+      group = interaction(time_window, species)
+    ),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.05,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  stat_compare_means(
+    aes(group = species),
+    method = "wilcox.test",
+    label = "p.signif",
+    hide.ns = FALSE
+  ) +
+  
+  scale_color_manual(values = time_point_cols, drop = FALSE) +
+  scale_fill_manual(values = time_fill_cols, drop = FALSE) +
+  scale_shape_manual(values = c("Dec" = 16, "Dem" = 17)) +
+  
+  labs(
+    x = "Time window",
+    y = "Bodyweight-normalized input rate ((g/hr)/g)",
+    shape = "Species"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none",
+    shape = guide_legend(title = "Species")
+  ) +
+  
+  theme_classic() +
+  theme(
+    legend.position = c(1, 1),
+    legend.justification = c(1, 1),
+    legend.background = element_blank()
+  )
+
+fig2_pos_bw_species_sig
+
+#### testing signif. between time windows: pooled ####
+
+fig2_pos_bw_time_sig <- ggplot(plot_data_pos_bw, aes(x = time_window, y = input_hr_bw)) +
+  
+  geom_violin(
+    aes(fill = time_window),
+    alpha = 0.5,
+    color = NA,
+    trim = FALSE
+  ) +
+  
+  geom_jitter(
+    aes(color = time_window),
+    width = 0.12,
+    size = 2.8,
+    alpha = 0.9
+  ) +
+  
+  stat_summary(
+    aes(group = time_window),
+    fun = mean,
+    geom = "point",
+    size = 3.5,
+    color = "black"
+  ) +
+  
+  stat_summary(
+    aes(group = time_window),
+    fun.data = mean_se,
+    geom = "errorbar",
+    width = 0.08,
+    color = "black",
+    linewidth = 0.5
+  ) +
+  
+  stat_compare_means(
+    comparisons = list(
+      c("Morning", "Afternoon"),
+      c("Morning", "Evening"),
+      c("Morning", "Night"),
+      c("Afternoon", "Evening"),
+      c("Afternoon", "Night"),
+      c("Evening", "Night")
+    ),
+    method = "wilcox.test",
+    label = "p.signif",
+    hide.ns = TRUE
+  ) +
+  
+  scale_color_manual(values = time_point_cols, drop = FALSE) +
+  scale_fill_manual(values = time_fill_cols, drop = FALSE) +
+  
+  labs(
+    x = "Time window",
+    y = "Bodyweight-normalized input rate ((g/hr)/g)"
+  ) +
+  
+  guides(
+    color = "none",
+    fill = "none"
+  ) +
+  
+  scale_y_continuous(
+    expand = expansion(mult = c(0.05, 0.25))
+  ) +
+  
+  theme_classic()
+
+fig2_pos_bw_time_sig
+
+#### A, B, C plots: bodyweight-normalized input rate ####
+library(rstatix)
+library(ggpubr)
+library(patchwork)
+
+## Shared y-axis 
+
+y_max_shared <- max(plot_data_pos_bw$input_hr_bw, na.rm = TRUE)
+y_limit_shared <- y_max_shared * 1.35
+
+
+## Get only significant comparisons
+
+get_sig_tests <- function(data) {
+  
+  tests <- data %>%
+    pairwise_wilcox_test(
+      input_hr_bw ~ time_window,
+      p.adjust.method = "BH"
+    ) %>%
+    filter(p.adj < 0.05)
+  
+  if (nrow(tests) > 0) {
+    tests <- tests %>%
+      mutate(
+        y.position = seq(
+          from = y_max_shared * 1.05,
+          by = y_max_shared * 0.08,
+          length.out = n()
+        )
+      )
+  }
+  
+  tests
+}
+
+
+## Plot function 
+
+make_bw_time_plot <- function(data, panel_label,
+                              show_y = FALSE,
+                              show_x_title = FALSE) {
+  
+  sig_tests <- get_sig_tests(data)
+  
+  p <- ggplot(data, aes(x = time_window, y = input_hr_bw)) +
+    
+    geom_violin(
+      aes(fill = time_window),
+      alpha = 0.5,
+      color = NA,
+      trim = FALSE
+    ) +
+    
+    geom_jitter(
+      aes(color = time_window, shape = species),
+      width = 0.12,
+      size = 2.6,
+      alpha = 0.9
+    ) +
+    
+    stat_summary(
+      aes(group = time_window),
+      fun = mean,
+      geom = "point",
+      size = 3.2,
+      color = "black"
+    ) +
+    
+    stat_summary(
+      aes(group = time_window),
+      fun.data = mean_se,
+      geom = "errorbar",
+      width = 0.08,
+      color = "black",
+      linewidth = 0.5
+    ) +
+    
+    scale_color_manual(values = time_point_cols, drop = FALSE) +
+    scale_fill_manual(values = time_fill_cols, drop = FALSE) +
+    scale_shape_manual(values = c("Dec" = 16, "Dem" = 17)) +
+    
+    scale_y_continuous(
+      limits = c(0, y_limit_shared),
+      expand = expansion(mult = c(0.02, 0.02))
+    ) +
+    
+    labs(
+      title = panel_label,
+      x = ifelse(show_x_title, "Time window", NULL),
+      y = ifelse(show_y, "Mass-specific total xylem ingestion rate ((g/hr)/g)", NULL)
+    ) +
+    
+    theme_classic() +
+    theme(
+      plot.title = element_text(face = "bold", hjust = 0),
+      legend.position = "none",
+      
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background  = element_rect(fill = "white", color = NA),
+      
+      axis.title.y = if (show_y) element_text() else element_blank(),
+      axis.text.y  = if (show_y) element_text() else element_blank(),
+      axis.ticks.y = if (show_y) element_line() else element_blank(),
+      
+      axis.text.x  = element_text(angle = 35, hjust = 1),
+      axis.ticks.x = element_line(),
+      axis.title.x = if (show_x_title) element_text() else element_blank()
+    )
+  
+  if (nrow(sig_tests) > 0) {
+    p <- p +
+      stat_pvalue_manual(
+        sig_tests,
+        label = "p.adj.signif",
+        xmin = "group1",
+        xmax = "group2",
+        y.position = "y.position",
+        tip.length = 0.01
+      )
+  }
+  
+  p
+}
+
+
+## Data subsets 
+
+plot_data_pos_bw_pooled <- plot_data_pos_bw
+
+plot_data_pos_bw_dec <- plot_data_pos_bw %>%
+  filter(species == "Dec")
+
+plot_data_pos_bw_dem <- plot_data_pos_bw %>%
+  filter(species == "Dem")
+
+
+## Create panels 
+
+pA_bw <- make_bw_time_plot(
+  plot_data_pos_bw_pooled,
+  "A)",
+  show_y = TRUE,
+  show_x_title = TRUE
+)
+
+pB_bw <- make_bw_time_plot(
+  plot_data_pos_bw_dec,
+  "B)",
+  show_y = FALSE,
+  show_x_title = TRUE   
+)
+
+pC_bw <- make_bw_time_plot(
+  plot_data_pos_bw_dem,
+  "C)",
+  show_y = FALSE,
+  show_x_title = FALSE
+)
+
+fig_bw_ABC <- pA_bw | pB_bw | pC_bw
+
+fig_bw_ABC
+
+#### significant results ####
+
+sig_bw_pooled <- get_sig_tests(plot_data_pos_bw_pooled)
+sig_bw_dec <- get_sig_tests(plot_data_pos_bw_dec)
+sig_bw_dem <- get_sig_tests(plot_data_pos_bw_dem)
+
+sig_bw_pooled
+sig_bw_dec
+sig_bw_dem
+
+plot_data_pos_bw_dem %>%
+  pairwise_wilcox_test(input_hr_bw ~ time_window, p.adjust.method = "none")
+
+#### Satistics for dec vs Dem ####
+
+plot_data_pos_bw %>%
+  group_by(species) %>%
+  summarise(
+    n = n(),
+    mean = mean(input_hr_bw, na.rm = TRUE),
+    sd = sd(input_hr_bw, na.rm = TRUE),
+    median = median(input_hr_bw, na.rm = TRUE),
+    IQR = IQR(input_hr_bw, na.rm = TRUE),
+    min = min(input_hr_bw, na.rm = TRUE),
+    max = max(input_hr_bw, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+wilcox_species <- wilcox.test(
+  input_hr_bw ~ species,
+  data = plot_data_pos_bw
+)
+
+wilcox_species
+
+model_species <- lm(input_hr_bw ~ species + time_window, data = plot_data_pos_bw)
+
+summary(model_species)
+anova(model_species)
+
+input_hr_bw ~ species * time_window
+model_interaction <- lm(input_hr_bw ~ species * time_window, data = plot_data_pos_bw)
+anova(model_interaction)
