@@ -157,6 +157,13 @@ library(rstatix)
 bodyweight_1 %>%
   wilcox_effsize(bodyweight_1 ~ species)
 
+# A tibble: 3 × 7
+#.y.          group1 group2 effsize    n1    n2 magnitude
+#* <chr>        <chr>  <chr>    <dbl> <int> <int> <ord>    
+#1 bodyweight_1 Cas    Dec      0.215    58    59 small    
+#2 bodyweight_1 Cas    Dem      0.435    58    62 moderate 
+#3 bodyweight_1 Dec    Dem      0.560    59    62 large   
+
 ## 4. Normality check
 by(bodyweight_1$bodyweight_1, bodyweight_1$species, shapiro.test)
 

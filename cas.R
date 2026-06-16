@@ -1421,3 +1421,419 @@ fig_weight_stacked
  # While the male showed higher weight loss, this observation
  # is based on only one individual and therefore cannot be
  # generalized or statistically tested.
+
+
+#### weight change Cas vs Control ####
+ 
+ library(tidyverse)
+ library(lubridate)
+ library(hms)
+ 
+ cas <- read_csv("data/cicten_tidy_cas.csv") %>%
+   mutate(group = "CAS")
+ 
+ control <- read_csv("data/cas_control.csv") %>%
+   mutate(group = "Control")
+ 
+ bodyweight_step <- bind_rows(cas, control) %>%
+   filter(!is.na(weight), !is.na(time), !is.na(date)) %>%
+   mutate(
+     date = dmy(date),
+     time = as_hms(time),
+     time_h = as.numeric(time) / 3600,
+     datetime = as.POSIXct(date) + as.numeric(time)
+   ) %>%
+   arrange(group, number, date, time_h) %>%
+   group_by(group, number, date) %>%
+   mutate(
+     prev_time = lag(time),
+     prev_weight = lag(weight),
+     step_change_g = weight - prev_weight,
+     step_change_pct = (weight - prev_weight) / prev_weight * 100,
+     time_window = paste0(prev_time, " to ", time)
+   ) %>%
+   ungroup()
+ 
+ step_table <- bodyweight_step %>%
+   filter(!is.na(step_change_pct)) %>%
+   select(
+     group, number, species, sex, date,
+     time_window,
+     prev_weight,
+     weight,
+     step_change_g,
+     step_change_pct
+   )
+ 
+ step_table
+
+ summary_table <- step_table %>%
+   group_by(group, time_window) %>%
+   summarise(
+     n = n(),
+     mean_pct_change = mean(step_change_pct, na.rm = TRUE),
+     sd_pct_change = sd(step_change_pct, na.rm = TRUE),
+     se_pct_change = sd_pct_change / sqrt(n),
+     .groups = "drop"
+   )
+ 
+ summary_table 
+
+## plot 
+ library(dplyr)
+ library(ggplot2)
+ library(hms)
+ 
+ plot_change <- bodyweight_step %>%
+   filter(group == "CAS") %>%   
+   arrange(number, date, time_h) %>%
+   group_by(number, date) %>%
+   mutate(
+     step_change_pct = (weight - lag(weight)) / lag(weight) * 100,
+     step_change_pct = ifelse(row_number() == 1, 0, step_change_pct)  # ✅ first = 0%
+   ) %>%
+   ungroup()
+ 
+ cols_all <- palette.colors(12, palette = "Paired")
+ 
+ bg_cols <- c(
+   "morning"   = cols_all[5],
+   "afternoon" = cols_all[9],
+   "evening"   = cols_all[3]
+ )
+ 
+ time_blocks <- data.frame(
+   period = c("morning", "afternoon", "evening"),
+   xmin = c(8, 12, 18),
+   xmax = c(11, 17, 20),
+   ymin = -Inf,
+   ymax = Inf
+ )
+ 
+ fig_weight_change <- ggplot() +
+   
+   geom_rect(
+     data = time_blocks,
+     aes(
+       xmin = xmin,
+       xmax = xmax,
+       ymin = ymin,
+       ymax = ymax,
+       fill = period
+     ),
+     alpha = 0.22,
+     inherit.aes = FALSE,
+     show.legend = FALSE
+   ) +
+   
+   geom_hline(yintercept = 0, linetype = "dashed") +
+   
+   geom_line(
+     data = plot_change,
+     aes(
+       x = time_h,
+       y = step_change_pct,
+       group = number
+     ),
+     linewidth = 0.5,
+     alpha = 0.7,
+     color = "grey35"
+   ) +
+   
+   geom_point(
+     data = plot_change,
+     aes(
+       x = time_h,
+       y = step_change_pct,
+       shape = sex
+     ),
+     size = 1.7,
+     stroke = 0.8,
+     color = "black",
+     fill = "black"
+   ) +
+   
+   scale_fill_manual(values = bg_cols) +
+   
+   scale_shape_manual(
+     values = c(
+       "female" = 15,
+       "male"   = 7
+     )
+   ) +
+   
+   scale_y_continuous(
+     labels = function(x) paste0(sprintf("%.1f", x), "%")
+   ) +
+   
+   scale_x_continuous(
+     breaks = seq(6, 22, by = 2),
+     labels = function(x) sprintf("%02d:00", x)
+   ) +
+   
+   labs(
+     x = "Time of day",
+     y = "Stepwise bodyweight change (%)",
+     shape = "Sex"
+   ) +
+   
+   theme_classic()
+ 
+ fig_weight_change
+ 
+ ## Plotting control in percent 
+ 
+ 
+ plot_cas_control_pct <- plot_cas_control_use %>%
+   arrange(number, time_h) %>%
+   group_by(number) %>%
+   mutate(
+     start_weight = first(weight),
+     weight_change_pct = (weight - start_weight) / start_weight * 100
+   ) %>%
+   ungroup()
+ 
+ fig_control_pct <- ggplot() +
+   
+   geom_rect(
+     data = time_blocks,
+     aes(
+       xmin = xmin,
+       xmax = xmax,
+       ymin = ymin,
+       ymax = ymax,
+       fill = period
+     ),
+     alpha = 0.2,
+     inherit.aes = FALSE,
+     show.legend = FALSE
+   ) +
+   
+   geom_hline(yintercept = 0, linetype = "dashed") +
+   
+   geom_line(
+     data = plot_cas_control_pct,
+     aes(
+       x = time_h,
+       y = weight_change_pct,
+       group = number
+     ),
+     linewidth = 0.5,
+     alpha = 0.7,
+     color = "grey35"
+   ) +
+   
+   geom_point(
+     data = plot_cas_control_pct,
+     aes(
+       x = time_h,
+       y = weight_change_pct
+     ),
+     size = 1,5,
+     alpha = 0.9,
+     color = "black",
+     shape = 15
+   ) +
+   
+   scale_fill_manual(values = bg_cols) +
+   
+   scale_y_continuous(
+     labels = function(x) paste0(sprintf("%.1f", x), "%")
+   ) +
+   
+   scale_x_continuous(
+     breaks = seq(8, 18, by = 2),
+     labels = function(x) sprintf("%02d:00", x)
+   ) +
+   
+   labs(
+     x = "Time of day",
+     y = "Bodyweight change (%)"
+   ) +
+   
+   theme_classic()
+ 
+ fig_control_pct
+ 
+ library(patchwork)
+ 
+ ## A) CAS plot (top)
+ 
+ fig_cas_A <- fig_weight_change +
+   labs(title = "A", x = NULL) +  
+   theme(
+     plot.title = element_text(face = "bold", size = 14, hjust = 0),
+     plot.margin = margin(5.5, 5.5, 2, 5.5)   
+   )
+ 
+ 
+ ## B) Control plot (bottom)
+ 
+ fig_control_B <- fig_control_pct +
+   labs(title = "B", x = "Time of day") +
+   theme(
+     plot.title = element_text(face = "bold", size = 14, hjust = 0),
+     plot.margin = margin(2, 5.5, 5.5, 5.5)   
+   )
+ 
+ 
+ ## Combined figure
+ 
+ fig_cas_control_pct <- fig_cas_A / fig_control_B +
+   plot_layout(heights = c(1, 1))
+ 
+ fig_cas_control_pct
+ 
+ 
+ #### Analysis####
+ 
+ 
+ ## Cas 
+ analysis_rate <- bodyweight_step %>%
+   arrange(group, number, date, time_h) %>%
+   group_by(group, number, date) %>%
+   mutate(
+     prev_time_h = lag(time_h),
+     prev_time   = lag(time),
+     
+     delta_time_h = time_h - prev_time_h,
+     
+     step_change_pct = (weight - lag(weight)) / lag(weight) * 100,
+     
+     change_per_hour = step_change_pct / delta_time_h,
+     
+     interval = paste0(prev_time, " → ", time)  
+   ) %>%
+   ungroup() %>%
+   filter(!is.na(delta_time_h), delta_time_h > 0)
+
+ #Table
+ rate_table <- analysis_rate %>%
+   select(
+     group,
+     number,
+     sex,
+     date,
+     interval,         
+     delta_time_h,
+     step_change_pct,
+     change_per_hour
+   )
+ 
+ rate_table
+
+ View(rate_table)
+ write_csv(rate_table, "data/rate_table.csv")
+
+ ## Control 
+ 
+ control_rate <- plot_cas_control_use %>%
+   arrange(number, time_h) %>%
+   group_by(number) %>%
+   mutate(
+     prev_time_h = lag(time_h),
+     prev_time = lag(time),
+     prev_weight = lag(weight),
+     
+     delta_time_h = time_h - prev_time_h,
+     
+     step_change_g = weight - prev_weight,
+     step_change_pct = (weight - prev_weight) / prev_weight * 100,
+     change_per_hour = step_change_pct / delta_time_h,
+     
+     interval = paste0(prev_time, " → ", time)
+   ) %>%
+   ungroup() %>%
+   filter(!is.na(delta_time_h), delta_time_h > 0)
+ 
+ # Table
+ control_rate_table <- control_rate %>%
+   select(
+     number,
+     sex,
+     interval,
+     delta_time_h,
+     prev_weight,
+     weight,
+     step_change_g,
+     step_change_pct,
+     change_per_hour
+   )
+ 
+ control_rate_table
+ 
+ View(control_rate_table)
+ write_csv(control_rate_table, "data/control_rate_table.csv")
+
+ ## Stats for cas 
+ 
+ cas_rate_summary <- analysis_rate %>%
+   filter(group == "CAS") %>%
+   summarise(
+     n = n(),
+     mean_rate = mean(change_per_hour, na.rm = TRUE),
+     sd_rate = sd(change_per_hour, na.rm = TRUE),
+     min_rate = min(change_per_hour, na.rm = TRUE),
+     max_rate = max(change_per_hour, na.rm = TRUE)
+   )
+ 
+cas_rate_summary
+# PER HOUR
+#n mean_rate sd_rate min_rate max_rate
+#<int>     <dbl>   <dbl>    <dbl>    <dbl>
+#   1    54      1.51    2.88    -2.16     9.89
+
+wilcox.test(
+  analysis_rate$change_per_hour[analysis_rate$group == "CAS"],
+  mu = 0
+)
+
+#Wilcoxon signed rank test with continuity correction
+
+#data:  analysis_rate$change_per_hour[analysis_rate$group == "CAS"]
+#V = 1062, p-value = 0.006021
+#alternative hypothesis: true location is not equal to 0
+# _> there is a sistematic weight change per hour 
+
+cas_gain_loss <- analysis_rate %>%
+  filter(group == "CAS") %>%
+  mutate(
+    direction = ifelse(change_per_hour > 0, "gain", "loss")
+  ) %>%
+  group_by(direction) %>%
+  summarise(
+    mean_rate = mean(change_per_hour, na.rm = TRUE),
+    n = n()
+  )
+
+cas_gain_loss 
+#direction mean_rate     n
+#<chr>         <dbl>   <int>
+#1 gain          3.64     29
+#2 loss         -0.961    25
+# -> more gain than loss 
+
+model_time_simple <- lm(
+  change_per_hour ~ interval,
+  data = analysis_rate %>% filter(group == "CAS")
+)
+
+anova(model_time_simple)
+
+#Analysis of Variance Table
+
+#Response: change_per_hour
+#Df Sum Sq Mean Sq F value    Pr(>F)    
+#interval   2 272.98 136.489  41.576 1.947e-11 ***
+#Residuals 51 167.43   3.283                      
+---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# -> it differs 
+  
+  model_time_aov <- aov(
+    change_per_hour ~ interval,
+    data = analysis_rate %>% filter(group == "CAS")
+  )
+
+TukeyHSD(model_time_aov)
+# -> all time windows are significantly different to each other 
