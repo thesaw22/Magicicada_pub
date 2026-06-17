@@ -84,7 +84,7 @@ cicten_clean <- CicTen %>%
   filter(!number %in% remove_ids)
 
 #### Final summary per cicada ####
-# Important structure in your sheet:
+# Important structure in data sheet:
 # weight_1 belongs to action_1
 # weight_2 belongs to action_3
 # weight_3 belongs to action_4
@@ -167,7 +167,12 @@ DecDem_
 write_csv(final_cicten, "final_cicten.csv")
 write_csv(plot_data, "DecDem_.csv")
 
-#### figure #####
+#-----------------------------------------------------------------
+#### Figure: Input rate (g/hr) + violin + time windows + mean & significance #####
+# figure shows all 4 time windows 
+# Violin shape 
+# significance with ns 
+
 library(ggplot2)
 library(ggpubr)
 library(dplyr)
@@ -230,7 +235,9 @@ fig_species_by_time <- ggplot(
 fig_species_by_time
 
 
-#### 3.1. fully separate plots #####
+#### Figure: ABCD, separate or combined #####
+#Same figure just separated of x- and y-axis 
+# no significance
 
 library(dplyr)
 library(ggplot2)
@@ -306,15 +313,18 @@ pA <- make_plot(plot_morning, "A) Morning", cols_all[5], cols_all[6], y_limits)
 pB <- make_plot(plot_noon,    "B) Afternoon", cols_all[9], cols_all[10], y_limits)
 pC <- make_plot(plot_evening, "C) Evening", cols_all[3], cols_all[4], y_limits)
 pD <- make_plot(plot_night,   "D) Night", cols_all[1], cols_all[2], y_limits)
-
+ 
+# separated plots 
 pA
 pB
 pC
 pD
 
+# combined plots (patchwork)
 (pA | pB) / (pC | pD)
 
-#### 4. Figure 1: raw points + mean ± SE ####
+#### Figure: raw points + mean ± SE ####
+# simple plot without violin
 
 plot_data_fig1 <- final_cicten %>%
   filter(!is.na(input_g_hr), !is.na(time_window)) %>%
@@ -438,8 +448,8 @@ fig1 <- ggplot(plot_data_fig1, aes(x = x_cat, y = input_g_hr)) +
 
 fig1
 
-#### 4.1. Figure 1: combining Dec and Dem ####
-
+#### Figure: raw points + mean ± SE -> Dec&Dem ####
+# species as one 
 library(dplyr)
 library(ggplot2)
 library(tibble)
@@ -548,7 +558,12 @@ fig1_pooled <- ggplot(plot_data_pooled, aes(x = x_cat, y = input_g_hr)) +
 
 fig1_pooled
 
-#### 5. Figure 2: violin + raw points + mean ± SE ####
+#-> better visualization of time window-effect (Behavioral pattern)
+# -> combination of species has a higher statistical power (Afternoon!)
+
+#### Figure: violin + raw points + mean ± SE ####
+# separation of species again
+# legend in the plot 
 
 plot_data_fig2 <- final_cicten %>%
   filter(!is.na(input_g_hr), !is.na(time_window)) %>%
@@ -650,7 +665,8 @@ fig2 <- ggplot(plot_data_fig2, aes(x = time_window, y = input_g_hr)) +
 
 fig2
 
-#### 5.1. Figure 2: violin with combination of Dec and Dem ####
+#### Figure: violin + raw points + mean ± SE & significance -> Dec&Dem ####
+# Again combining Dec and Dem for higher statistic power 
 
 plot_data_fig2_pooled <- final_cicten %>%
   filter(!is.na(input_g_hr), !is.na(time_window)) %>%
@@ -749,6 +765,8 @@ fig2_pooled <- ggplot(plot_data_fig2_pooled, aes(x = time_window, y = input_g_hr
 
 fig2_pooled
 
+#-> shows first significance for time window (behavioral pattern) 
+
 ## 5.1.1 statistics to this 
 pairwise.wilcox.test(
   x = plot_data_fig2_pooled$input_g_hr,
@@ -825,7 +843,7 @@ DecDem_ %>%
 # Input appeared highest in the Morning and lowest in the Afternoon,
 # with intermediate values in the Evening and Night.
 # However, sample sizes were uneven, especially in the Afternoon (n = 6),
-# so these patterns should be interpreted cautiously.
+# low power in the afternoon makes it difficult to interpret Results (!!!)
 
 
 ## 4. Linear model: species * time_window
@@ -835,16 +853,16 @@ anova(model)
 
 # Interpretation of ANOVA:
 # species: F = 0.803, p = 0.374
-# → No significant main effect of species
-# → Dec and Dem do not differ significantly in input rate overall
+# -> No significant main effect of species
+# -> Dec and Dem do not differ significantly in input rate overall
 #
 # time_window: F = 2.380, p = 0.080 
-# → No statistically significant main effect of time window at alpha = 0.05
-# → There is only a weak trend suggesting that input may vary across time
+# -> No statistically significant main effect of time window at alpha = 0.05
+# -> There is only a weak trend suggesting that input may vary across time
 #
 # species × time_window: F = 0.301, p = 0.825
-# → No interaction between species and time window
-# → The temporal pattern in input does not differ between Dec and Dem
+# -> No interaction between species and time window
+# -> temporal pattern in input does not differ between Dec and Dem
 
 
 ## 5. Model coefficients
@@ -856,22 +874,22 @@ summary(model)
 # for the reference category, i.e. Dec in the Morning.
 #
 # speciesDem: estimate = 0.0167, p = 0.193
-# → Dem tends to have slightly higher Morning input than Dec,
-#   but this difference is not significant
+# -> Dem tends to have slightly higher Morning input than Dec,
+#   but not significant
 #
 # time_windowAfternoon: estimate = -0.0186, p = 0.301
-# → In Dec, Afternoon input tends to be lower than Morning,
-#   but not significantly so
+# -> In Dec, Afternoon input tends to be lower than Morning,
+#   but not significant
 #
 # time_windowEvening: estimate = -0.00814, p = 0.581
-# → In Dec, Evening input does not differ significantly from Morning
+# -> In Dec, Evening input does not differ significantly from Morning
 #
 # time_windowNight: estimate = -0.0187, p = 0.233
-# → In Dec, Night input tends to be lower than Morning,
-#   but not significantly so
+# -> In Dec, Night input tends to be lower than Morning,
+#   but not significant
 #
-# All interaction terms are non-significant (all p > 0.05)
-# → The difference between Dec and Dem does not change across time windows
+# -> All interaction terms are not significant (all p > 0.05)
+# -> The difference between Dec and Dem does not change across time windows (!!!)
 
 
 ## 6. Model fit
@@ -909,18 +927,19 @@ anova(model_sex)
 
 # Interpretation (ANOVA):
 # species: F = 0.82, p = 0.369
-# → No significant difference in input rate between Dec and Dem
+# -> No significant difference in input rate between Dec and Dem
 
 # time_window: F = 2.44, p = 0.076
-# → No statistically significant effect at alpha = 0.05,
+# -> No significant effect at alpha = 0.05,
 #   but a trend suggesting input may vary across time
 
 # sex: F = 2.03, p = 0.161
-# → No significant difference between males and females
+# -> No significant difference for sex
 
 # species × time_window: F = 0.35, p = 0.787
-# → No interaction
-# → Temporal patterns do not differ between species
+# -> No interaction
+# -> Temporal patterns do not differ between species
+  # -> this might need a figure for the supplements (!!!)
 
 
 # Model coefficients
@@ -930,30 +949,30 @@ summary(model_sex)
 # Interpretation:
 
 # Intercept (0.0399, p < 0.001)
-# → Estimated mean input for the reference group:
+# -> Estimated mean input for the reference group:
 #    Dec females in the Morning
 
 # speciesDem (0.0154, p = 0.224)
-# → Dem tends to have slightly higher input than Dec in the Morning,
-#   but this difference is not significant
+# -> Dem tends to have slightly higher input than Dec in the Morning,
+#   but not significant
 
 # time_windowAfternoon (-0.0237, p = 0.193)
-# → Input tends to be lower in the Afternoon compared to Morning (in Dec females),
-#   but not significantly
+# -> Input tends to be lower in the Afternoon compared to Morning (in Dec females),
+#   but not significant
 
 # time_windowEvening (-0.0091, p = 0.532)
-# → No difference between Evening and Morning
+# -> No difference between Evening and Morning
 
 # time_windowNight (-0.0227, p = 0.147)
-# → Input tends to be lower at Night compared to Morning,
-#   but not significantly
+# -> Input tends to be lower at Night compared to Morning,
+#   but not significant
 
 # sexmale (-0.0129, p = 0.148)
-# → Males tend to have slightly lower input than females,
-#   but this difference is not statistically significant
+# -> Males tend to have slightly lower input than females,
+#   but not significant
 
-# All interaction terms are non-significant
-# → The effect of time does not differ between species
+# All interaction terms are not significant
+# -> The effect of time does not differ between species (or sex)
 
 
 # Model fit
@@ -969,26 +988,27 @@ summary(model_sex)
 #
 # The overall model is not significant (p = 0.219),
 # suggesting that species, time window, sex, and their interaction
-# do not jointly explain a substantial portion of variation.
+# do not jointly explain a substantial portion of variation.(!!!)
 
 
-# Final interpretation (for paper)
+# Final interpretation 
 
 # Input rate did not differ significantly between species or sexes,
 # and there was no significant interaction between species and time window.
 #
 # There was a weak trend for input to vary across time windows,
 # with lower values in the Afternoon and Night relative to Morning,
-# but this pattern was not statistically significant.
+# but this pattern was not significant.
 #
 # Overall, variation in input rate was high relative to the observed
-# differences among groups, and the model explained little of the variance.
+# differences among groups, and the model explained little of the variance. (low power ?)
 
 
-#>While the overall effect of time window was not statistically significant,
-#>pairwise comparisons revealed a significant difference between Morning and Afternoon input rates.
+#-> While the overall effect of time window was not significant,
+#-> pairwise comparisons revealed a significant difference between Morning and Afternoon input rates.
+  # -> Seen in: Figure: violin + raw points + mean ± SE & significance -> Dec&Dem
 
-#----------------------------------------------------------------
+#-----------------------------------------------------------------
 #### CicTen Input Rate + Plots - WITHOUT NEG ####
 
 library(dplyr)
@@ -1013,10 +1033,10 @@ plot_data_pos <- final_cicten %>%
 
 plot_data_pos
 
-# Optional save
+# save as csv
 write_csv(plot_data_pos, "final_cicten_pos.csv")
 
-#### Check species differences within each time window ####
+#### Checking species differences within each time window ####
 
 plot_data_species_pos <- plot_data_pos %>%
   mutate(
@@ -1046,7 +1066,9 @@ species_tests_pos
 #3 Evening       0.429
 #4 Night         0.352
 
-#### Figure: species comparison within each time window ####
+#### Figure: Input rate (g/hr) + violin + time winow + mean ± SE (POS)####
+# same figure as previously
+# data only includes positive input 
 
 fig_species_by_time_pos <- ggplot(
   plot_data_species_pos,
@@ -1137,7 +1159,7 @@ fig_species_by_time_pos <- ggplot(
 fig_species_by_time_pos
 
 
-#### 3.1. Fully separate plots #####
+#### Figure: ABCD, separate or combined #####
 
 plot_morning_pos   <- plot_data_species_pos %>% filter(time_window == "Morning")
 plot_afternoon_pos <- plot_data_species_pos %>% filter(time_window == "Afternoon")
@@ -1202,7 +1224,7 @@ library(patchwork)
 (pApos | pBpos) / (pCpos | pDpos)
 
 
-#### 4. Figure 1: raw points + mean ± SE ####
+#### Figure: raw points + mean ± SE ####
 
 fig1_pos <- ggplot(plot_data_pos, aes(x = x_cat, y = input_g_hr)) +
   
@@ -1304,8 +1326,9 @@ fig1_pos <- ggplot(plot_data_pos, aes(x = x_cat, y = input_g_hr)) +
 
 fig1_pos
 
+# -> legend should be rearranged if used (!)
 
-#### 4.1. Figure 1: combining Dec and Dem ####
+#### Figure: raw points + mean ± SE -> Dec&Dem ####
 
 fig1_pos_pooled <- ggplot(plot_data_pos, aes(x = x_cat, y = input_g_hr)) +
   
@@ -1387,7 +1410,7 @@ fig1_pos_pooled <- ggplot(plot_data_pos, aes(x = x_cat, y = input_g_hr)) +
 fig1_pos_pooled
 
 
-#### 5. Figure 2: violin + raw points + mean ± SE ####
+#### Figure: violin + raw points + mean ± SE ####
 
 fig2_pos <- ggplot(plot_data_pos, aes(x = time_window, y = input_g_hr)) +
   
@@ -1478,7 +1501,7 @@ fig2_pos <- ggplot(plot_data_pos, aes(x = time_window, y = input_g_hr)) +
 fig2_pos
 
 
-#### 5.1. Figure 2: violin with combination of Dec and Dem ####
+#### Figure: violin + raw points + mean ± SE & significance -> Dec&Dem ####
 
 fig2_pos_pooled <- ggplot(plot_data_pos, aes(x = time_window, y = input_g_hr)) +
   
@@ -1567,17 +1590,20 @@ fig2_pos_pooled <- ggplot(plot_data_pos, aes(x = time_window, y = input_g_hr)) +
 
 fig2_pos_pooled
 
-## Stats
+#-> usage of only positive input changes time window significance (!!!)
+#-> argumentation for positive only in paper (...)
+
+#### Statisitic tests ####
 
 kruskal_test <- kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
 kruskal_test
-#input(g/hr) bz time_window
+#input(g/hr) by time_window
 # p = 0,00191
 
 pairwise_tests <- pairwise.wilcox.test(
   plot_data_pos$input_g_hr,
   plot_data_pos$time_window,
-  p.adjust.method = "BH"  # or "bonferroni"
+  p.adjust.method = "BH"  #Benjamini Hochberg correction
 )
 
 pairwise_tests
@@ -1586,7 +1612,7 @@ pairwise_tests
 # Morning vs Night: p = 0,014
 # Evening vs Night: p = 0,019
 
-#install.packages("rstatix")   # only once
+#install.packages("rstatix")   
 library(rstatix)
 
 pairwise_results <- plot_data_pos %>%
@@ -1596,8 +1622,6 @@ pairwise_results <- plot_data_pos %>%
   )
 
 pairwise_results
-
-#### Statistics: POSITIVE #####
 
 library(dplyr)
 
@@ -1615,12 +1639,12 @@ plot_data_pos %>%
   )
 
 # Interpretation:
-# Dec mean input ≈ 0.0263 g/hr
-# Dem mean input ≈ 0.0391 g/hr
+# Dec (n = 29) mean input ≈ 0.0263 g/hr
+# Dem (n = 22) mean input ≈ 0.0391 g/hr
 #
-# → Dem still shows a somewhat higher mean input rate than Dec (n = 29)
-# → But variability is also high, especially in Dem (n = 22)
-# → So the numerical difference is not necessarily a statistically reliable one
+# -> Dem still shows a somewhat higher mean input rate than Dec 
+# -> But variability is also high, especially in Dem
+# -> So the numerical difference is not necessarily a statistically reliable one
 
 
 ## 2. Linear model: species * time_window
@@ -1637,18 +1661,18 @@ summary(model)
 
 # Interpretation:
 # None of the individual coefficients are significant
-# → This means no single contrast stands out strongly against the reference category
-# → This is consistent with the ANOVA:
+# -> no single contrast stands out strongly against the reference category
+# -> This is consistent with the ANOVA:
 #    - weak species effect
 #    - only a trend for time
 #
 # The Night coefficient is positive
-# → suggests input tends to be higher at night,
+# -> suggests input tends to be higher at night,
 #   but there is still too much variability for strong support in this linear model
 
 
 ## 4. Estimated marginal means:
-#    compare species within each time window
+# comparing species within each time window
 
 library(emmeans)
 
@@ -1660,9 +1684,9 @@ emmeans(model, pairwise ~ species | time_window)
 # Evening:    Dec vs Dem p = 0.554
 # Night:      Dec vs Dem p = 0.559
 #
-# → No significant species differences in any time window
-# → Dem is numerically higher in several windows, especially Night,
-#   but not significantly so
+# -> No significant species differences in any time window
+# -> Dem is numerically higher in several windows, especially Night,
+#   but not significant
 
 
 ## 5. Effect sizes
@@ -1676,8 +1700,8 @@ eta_squared(model)
 # time_window ≈ 0.13 -> moderate effect
 # interaction ≈ 0.0-e -> negligible effect
 #
-# → Time explains more variation than species
-# → Species contributes little to variation in positive input rates
+# -> Time explains more variation than species
+# -> Species contributes little to variation in positive input rates
 
 
 ## 6. Non-parametric test across time windows
@@ -1686,20 +1710,20 @@ kruskal.test(input_g_hr ~ time_window, data = plot_data_pos)
 
 # Interpretation:
 # p = 0.0058
-# → Strong evidence that input differs among time windows
-# → This is more convincing than the linear model result
-# → Likely because the data are not well-behaved for standard ANOVA assumptions
+# -> Strong evidence that input differs among time windows
+# -> Better than the linear model result (!!)
+# -> Likely because the data are not good for standard ANOVA assumptions
 #
 # Important:
-# Kruskal-Wallis only tells us that at least one time window differs.
-# It does NOT tell us which time windows differ from each other.
+# Kruskal-Wallis only says that at least one time window differs.
+# It does NOT tell us which time windows differ from each other. -> further testing 
 
 
 ## 7. Alternative if FSA still errors
 
-# A very robust alternative is rstatix::dunn_test()
+# robust alternative is rstatix::dunn_test()
 
-install.packages("rstatix")
+#install.packages("rstatix")
 library(rstatix)
 
 plot_data_pos %>%
@@ -1709,66 +1733,66 @@ plot_data_pos %>%
 # Pairwise comparisons between time windows (BH-adjusted)
 
 # Morning vs Afternoon: p.adj = 0.258
-# → Not significant
-# → Input rates are similar between these periods
+# -> Not significant
+# -> Input rates are similar between these periods
 
 # Morning vs Evening: p.adj = 0.807
-# → Not significant
-# → No difference between early and mid-day input
+# -> Not significant
+# -> No difference between early and mid-day input
 
 # Morning vs Night: p.adj = 0.0248 *
-# → Significant
-# → Input at Night is higher than in the Morning
+# -> Significant
+# -> Input at Night is higher than in the Morning
 
 # Afternoon vs Evening: p.adj = 0.258
-# → Not significant
-# → These two intermediate periods are similar
+# -> Not significant
+# -> These two periods are similar in statistic (...)
 
 # Afternoon vs Night: p.adj = 0.105
-# → Not significant (trend only)
-# → Suggests Night may be higher, but evidence is weak
+# -> Not significant 
+# -> Suggests Night may be higher, but evidence is weak
 
 # Evening vs Night: p.adj = 0.0248 *
-# → Significant
-# → Input at Night is higher than in the Evening
+# -> Significant
+# -> Input at Night is higher than in the Evening
 
-
-##  Final interpretation
+#-----------------------------------------------------------------
+####  Final interpretation ####
 
 # 1. Strongest pattern:
-# → Night vs (Morning + Evening) is significantly different
+# -> Night vs (Morning + Evening) is significantly different
 
 # 2. Intermediate periods:
-# → Afternoon and Evening are not clearly different from each other
-# → Afternoon vs Night shows only a weak trend
+# -> Afternoon and Evening are not clearly different from each other
+# -> Afternoon vs Night shows only a weak trend
 
 # 3. Overall structure:
-# Morning   → lowest input
-# Afternoon → intermediate
-# Evening   → intermediate
-# Night     → highest input
+# Morning   -> lowest input
+# Afternoon -> intermediate
+# Evening   -> intermediate
+# Night     -> highest input
 
 
 ## Biological conclusion
 
-# → Input rate follows a diel pattern:
+# -> Input rate follows a diel pattern:
 #    - Low in the morning
 #    - Gradually increases
 #    - Peaks at night
 
-# → The significant contrasts (Night vs Morning, Night vs Evening)
+# -> The significant contrasts (Night vs Morning, Night vs Evening)
 #   identify Night as the key period driving the overall effect
 
-# → Combined with previous results:
+# -> Combined with previous results:
 #    - Species (Dec vs Dem): NOT important
 #    - Time of day: main driver of input variation
 
 # Clean takeaway:
-# → Feeding/input is primarily time-dependent, with a clear nocturnal peak
+# -> Feeding/input is primarily time-dependent, with a clear nocturnal peak
 
 
 #----------------------------------------------------------------
-#### Excretion probability + positive input rate ####
+#### Excretion probability with positive input rate ####
 #Clean corrected Input sheet
 
 input_clean <- Input %>%
@@ -1819,8 +1843,8 @@ input_clean <- Input %>%
 
 
 #### Excretion probability: actual pee data ####
-#### This is NOT input rate.
-#### It uses observed pee events only.
+# This is NOT input rate.
+# It uses observed pee events only.
 
 pee_data <- input_clean %>%
   mutate(
@@ -1843,7 +1867,7 @@ excretion_rate <- pee_data %>%
 excretion_rate
 
 
-#### Probability plot ####
+#### Figure: Excretion probability ####
 
 prob_plot <- ggplot(
   excretion_rate,
@@ -1882,14 +1906,20 @@ pee_table <- table(pee_data$time_window, pee_data$peed)
 
 pee_table
 
+#           0  1
+#Morning    4 21
+#Afternoon  0  6
+#Evening    6  9
+#Night      6  6
+
 fisher_pee <- fisher.test(pee_table)
 
 fisher_pee
-
+# p-value = 0.04041
 
 #### Positive input rate ####
-#### This is separate from pee probability.
-#### Here we use corrected input_hr and only positive input-rate observations.
+# This is separate from pee probability.
+# corrected input_hr and only positive input-rate observations.
 
 plot_data_pos <- input_clean %>%
   filter(
@@ -1917,13 +1947,18 @@ input_summary <- plot_data_pos %>%
 
 input_summary
 
+#Morning: Median -> 0.0396
+#Afternoon: Median -> 0.0107
+#Evening: Median -> 0.0389
+#Night: Median -> 0.0064
 
 #### Kruskal-Wallis test ####
 
 kruskal_input <- kruskal.test(input_hr ~ time_window, data = plot_data_pos)
 
 kruskal_input
-
+#data:  input_hr by time_window
+#Kruskal-Wallis chi-squared = 16.746, df = 3, p-value = 0.000797
 
 #### Pairwise Wilcoxon tests ####
 
@@ -1934,8 +1969,16 @@ pairwise_input <- plot_data_pos %>%
   )
 
 pairwise_input
+
+#-> Morning - Afternoon = significant **
+#-> Morning - Evening = ns 
+#-> Morning - Night = significant **
+#-> Afternoon - Evening = significant **
+#-> Afternoon - Night = ns 
+#-> Evening - Night = significant *
+
 #----------------------------------------------------------------
-#### Bodyweight and input rate: Dec vs Dem ####
+#### Body weight and input rate: Dec vs Dem ####
 # Clean corrected Input sheet
 
 input_clean <- Input %>%
@@ -1971,7 +2014,7 @@ input_clean <- Input %>%
   droplevels()
 
 
-#### Final bodyweight/input dataset ####
+#### Final body weight/input dataset ####
 
 input_bw_data <- input_clean %>%
   select(number, species, sex, input_hr, lab_weight)
@@ -1981,7 +2024,7 @@ input_bw_data
 write_csv(input_bw_data, "input_bodyweight_positive_corrected.csv")
 
 
-#### 1. Plot: bodyweight vs input rate, species separated ####
+#### Figure: body weight vs input rate, species separated ####
 
 plot_bodyweight_input_s <- ggplot(
   input_bw_data,
@@ -2009,9 +2052,8 @@ plot_bodyweight_input_s <- ggplot(
 plot_bodyweight_input_s
 
 
-#### 2. Main model: bodyweight + species ####
-#### This is the main test for whether species differ after accounting
-#### for bodyweight.
+#### Statistic test: body weight + species ####
+# This is the main test for whether species differ after accounting to body weight.
 
 model_species_bw <- lm(
   input_hr ~ lab_weight + species,
@@ -2022,7 +2064,7 @@ summary(model_species_bw)
 anova(model_species_bw)
 
 
-#### 3. Plot: bodyweight vs input rate by species and sex ####
+#### Figure: body weight vs input rate by species and sex ####
 
 plot_sex_species <- ggplot(
   input_bw_data,
@@ -2059,8 +2101,8 @@ plot_sex_species <- ggplot(
 plot_sex_species
 
 
-#### 4. Secondary model: bodyweight + species + sex ####
-#### This checks whether sex explains additional variation.
+#### Statistic test: body weight + species + sex ####
+# This checks whether sex explains additional variation.
 
 model_species_bw_sex <- lm(
   input_hr ~ lab_weight + species + sex,
@@ -2069,11 +2111,11 @@ model_species_bw_sex <- lm(
 
 summary(model_species_bw_sex)
 anova(model_species_bw_sex)
+# -> no significance
 
-
-#### 5. Interaction model: bodyweight × species ####
-#### This checks whether the bodyweight-input relationship differs by species.
-
+#### Statistic test: body weight × species ####
+# This checks whether the body weight-input relationship differs by species.
+# interaction model (*)
 model_bw_species_interaction <- lm(
   input_hr ~ lab_weight * species,
   data = input_bw_data
@@ -2083,8 +2125,9 @@ summary(model_bw_species_interaction)
 anova(model_bw_species_interaction)
 
 
-#### 6. Interaction model: species × sex ####
-#### This checks whether species differences depend on sex.
+#### Statistic test: species × sex ####
+# This checks whether species differences depend on sex.
+# interaction model
 
 model_species_sex_interaction <- lm(
   input_hr ~ lab_weight + species * sex,
@@ -2094,9 +2137,11 @@ model_species_sex_interaction <- lm(
 summary(model_species_sex_interaction)
 anova(model_species_sex_interaction)
 
+#-> no significance 
 
-#### 7. Plot: species comparison within each sex ####
-#### Visual only. Do not over-interpret without significant interaction.
+#### Figure: species comparison within each sex ####
+# Visual only. 
+# the separation of sex probablz does not have a lot of meaning or statistic value (...)
 
 plot_species_by_sex <- ggplot(
   input_bw_data,

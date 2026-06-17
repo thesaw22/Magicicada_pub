@@ -40,3 +40,5 @@ Day 6:
     
 Day 7:
 Putting evreything together
+
+Note: DecDem2 was created because DecDem had some mistakes with the time windows and n. Clean up of the code was too confusing.Therefore, I created a new code. Out of transparency, DecDem is still on github BUT results were not used in the paper! 

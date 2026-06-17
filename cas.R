@@ -1375,6 +1375,24 @@ fig_weight_stacked
  # reach statistical significance.
  # Report this together with the p-value if relevant.
  
+#### Stats: ONLY female ####
+ 
+ bw_loss_f <- bw_loss %>%
+   filter(sex == "female")
+ 
+ bw_loss_f %>%
+   summarise(
+     n = n(),
+     mean_loss = mean(loss_percent, na.rm = TRUE),
+     sd_loss = sd(loss_percent, na.rm = TRUE),
+     min_loss = min(loss_percent, na.rm = TRUE),
+     max_loss = max(loss_percent, na.rm = TRUE)
+   )
+ 
+ wilcox.test(bw_loss_f$loss_percent, mu = 0)
+ 
+ t.test(bw_loss_f$loss_percent, mu = 0)
+ 
 #### Overall feedback####
  
  ### Overall bodyweight loss
