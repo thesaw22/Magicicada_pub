@@ -20,7 +20,7 @@ barplot(rep(1, length(cols_all)),
 
 #> Writing the data into long format
 #> not adding a plot_iD 
-#> aslo changing the numbers into negative -> negative pressure 
+#> also changing the numbers into negative -> negative pressure 
 
 library(readr)
 library(dplyr)
@@ -473,6 +473,66 @@ p_xylem <- ggplot() +
   )
 
 p_xylem
+
+#### Statistics for pressure ####
+
+library(dplyr)
+
+pressure_window_stats <- pressure_tidy %>%
+  mutate(
+    time_parsed = as.POSIXct(time, format = "%H:%M"),
+    hour = as.numeric(format(time_parsed, "%H")) +
+      as.numeric(format(time_parsed, "%M")) / 60,
+    
+    period = case_when(
+      hour >= 7  & hour < 10 ~ "morning",
+      hour >= 10 & hour < 17 ~ "afternoon",
+      hour >= 17 & hour < 20 ~ "evening",
+      hour >= 20 | hour < 7  ~ "night",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  
+  # First calculate one mean for each sampling time
+  group_by(period, time) %>%
+  summarise(
+    time_mean_pressure = mean(pressure, na.rm = TRUE),
+    n_measurements = n(),
+    .groups = "drop"
+  ) %>%
+  
+  # Then summarize the time-point means within each period
+  group_by(period) %>%
+  summarise(
+    n_timepoints = n(),
+    n_measurements = sum(n_measurements),
+    mean_pressure = mean(time_mean_pressure, na.rm = TRUE),
+    sd = sd(time_mean_pressure, na.rm = TRUE),
+    se = sd / sqrt(n_timepoints),
+    ci_lower = mean_pressure -
+      qt(0.975, df = n_timepoints - 1) * se,
+    ci_upper = mean_pressure +
+      qt(0.975, df = n_timepoints - 1) * se,
+    min = min(time_mean_pressure, na.rm = TRUE),
+    max = max(time_mean_pressure, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    period = factor(
+      period,
+      levels = c("morning", "afternoon", "evening", "night")
+    )
+  ) %>%
+  arrange(period)
+
+pressure_window_stats
+#> Mean of time point measurements
+#>  period    n_timepoints   n_measurements  mean_pressure    sd    se     ci_lower  ci_upper    min    max
+#<fct>            <int>          <int>         <dbl>        <dbl>   <dbl>    <dbl>    <dbl>    <dbl>  <dbl>
+#1 morning              3             36         -5.87      2.72    1.57    -12.6     0.894    -8.81  -3.43
+#2 afternoon            7             51        -12.3       1.13    0.425   -13.4    -11.3     -13.7  -10.4 
+#3 evening              3             27         -8.37      2.44    1.41    -14.4    -2.32    -10.7   -5.87
+#4 night                3             15         -2.43      1.16.   0.667    -5.30    0.442    -3.76  -1.63
 
 #### Putiing it into 24h to match temperature ####
 
@@ -988,12 +1048,13 @@ library(patchwork)
 
 combined_temp_xylem <- temperature_plot_no_blocks / p_xylem_24h +
   plot_layout(heights = c(1, 1.15)) +
-  plot_annotation(tag_levels = "A") &
+  plot_annotation(
+    tag_levels = "A",
+    tag_suffix = ")"
+  ) &
   theme(
     plot.tag = element_text(size = 16, face = "bold")
   )
-
 combined_temp_xylem
-
 
     

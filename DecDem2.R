@@ -38,7 +38,7 @@ time_point_cols <- c(
 
 
 #### Removed IDs ####
-# these iDs are removed becuase individual died in field or lost their pipette tip 
+# these iDs are removed because individual died in field or lost their pipette tip 
 
 remove_ids <- c(
   24,
@@ -114,7 +114,7 @@ write_csv(input_clean, "input_clean_corrected.csv")
 write_csv(DecDem_, "DecDem_input_corrected.csv")
 
 
-#### Figure 1: species by time window, faceted ####
+#### Figure 1: Input rate (g/hr), violin with significance (DecDem) ####
 
 fig_species_by_time <- ggplot(
   DecDem_,
@@ -157,8 +157,11 @@ fig_species_by_time <- ggplot(
 
 fig_species_by_time
 
+#-> mo significance in any time winodws for species 
+#  Needs exact testing 
 
-#### Figure 2: fully separate plots by time window ####
+
+#### Figure 2: separate plots by time window & patchwork + mean ± SE####
 
 plot_morning <- DecDem_ %>% filter(time_window == "Morning")
 plot_noon    <- DecDem_ %>% filter(time_window == "Afternoon")
@@ -225,16 +228,18 @@ pB <- make_plot(plot_noon,    "B) Afternoon", cols_all[9], cols_all[10], y_limit
 pC <- make_plot(plot_evening, "C) Evening", cols_all[3], cols_all[4], y_limits)
 pD <- make_plot(plot_night,   "D) Night", cols_all[1], cols_all[2], y_limits)
 
-pA
-pB
-pC
-pD
+# separate figures 
+pA #Morning
+pB #Afternoon
+pC #Evening
+pD #Night
 
+# patchwork
 fig_separate <- (pA | pB) / (pC | pD)
 fig_separate
 
 
-#### Figure 3: raw points + mean ± SE, species separated within time windows ####
+#### Figure 3: raw points + mean ± SE + time windows ####
 
 plot_data_fig1 <- DecDem_ %>%
   mutate(
@@ -331,9 +336,9 @@ fig1 <- ggplot(plot_data_fig1, aes(x = x_cat, y = input_hr)) +
   coord_cartesian(clip = "off")
 
 fig1
+# legend needs clean up if used (!)
 
-
-#### Figure 4: raw points + mean ± SE, Dec and Dem pooled ####
+#### Figure 4: raw points + mean ± SE -> Dec&Dem ####
 
 plot_data_pooled <- DecDem_ %>%
   mutate(
@@ -491,8 +496,9 @@ fig2 <- ggplot(plot_data_fig2, aes(x = time_window, y = input_hr)) +
 
 fig2
 
+#legend needs to be fixed if publication (!)
 
-#### Figure 6: violin + raw points + mean ± SE, Dec and Dem pooled ####
+#### Figure 6: violin + raw points + mean ± SE, -> Dec&Dem ####
 
 plot_data_fig2_pooled <- DecDem_
 
@@ -565,10 +571,9 @@ fig2_pooled <- ggplot(plot_data_fig2_pooled, aes(x = time_window, y = input_hr))
   theme_classic()
 
 fig2_pooled
+#-> significance in time window for Morning to Night (**) and Morning to Afternoon (**) 
 
-
-#### Statistics ####
-
+#### Statistics ---------------------------------------------------------
 #### 1. Overall summary ####
 
 DecDem_ %>%
@@ -580,6 +585,11 @@ DecDem_ %>%
     median_input = median(input_hr, na.rm = TRUE),
     sd_input = sd(input_hr, na.rm = TRUE)
   )
+
+# A tibble: 1 × 6
+#n min_input max_input mean_input median_input sd_input
+#     <int>     <dbl>     <dbl>      <dbl>        <dbl>    <dbl>
+# 1    58     -0.0289     0.226     0.0328       0.0282   0.0401
 
 
 #### 2. Summary by species ####
@@ -596,6 +606,11 @@ DecDem_ %>%
     .groups = "drop"
   )
 
+# A tibble: 2 × 7
+#species     n min_input max_input mean_input median_input sd_input
+# <fct>   <int>     <dbl>     <dbl>      <dbl>        <dbl>    <dbl>
+#1 Dec      31    -0.0289     0.170     0.0284       0.0277   0.0331
+#2 Dem      27    -0.0094     0.226     0.0379       0.0315   0.0470
 
 #### 3. Summary by time window ####
 
@@ -628,8 +643,8 @@ DecDem_ %>%
 
 
 #### 5. Main model ####
-#### This is the main statistical test matching your main biological question:
-#### Does input rate differ by species, time window, or their interaction?
+# This is the main statistical test for main biological question:
+#-> Does input rate differ by species, time window, or their interaction?
 
 model <- lm(input_hr ~ species * time_window, data = DecDem_)
 
@@ -1710,7 +1725,7 @@ make_bw_time_plot <- function(data, panel_label,
     labs(
       title = panel_label,
       x = ifelse(show_x_title, "Time window", NULL),
-      y = ifelse(show_y, "Mass-specific total xylem ingestion rate ((g/hr)/g)", NULL)
+      y = ifelse(show_y, "Mass-specific total input rate ((g/hr)/body mass)", NULL)
     ) +
     
     theme_classic() +

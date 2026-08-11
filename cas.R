@@ -782,8 +782,8 @@ ggplot(analysis_data, aes(x = time_h, y = weight)) +
     shape = "Sex"
   )
 
-___________________________________________________________
-_____________________________________________________________________
+
+####_____________________________________________________________________
 #### Cas: Control ####
 
 library(dplyr)
@@ -1702,156 +1702,533 @@ fig_weight_stacked
  
  fig_cas_control_pct
  
+#### weight change in form of bar graph####
+ library(dplyr)
+ library(ggplot2)
+ library(patchwork)
  
- #### Analysis####
+ cols_all <- palette.colors(12, palette = "Paired")
  
  
- ## Cas 
- analysis_rate <- bodyweight_step %>%
-   arrange(group, number, date, time_h) %>%
-   group_by(group, number, date) %>%
-   mutate(
-     prev_time_h = lag(time_h),
-     prev_time   = lag(time),
-     
-     delta_time_h = time_h - prev_time_h,
-     
-     step_change_pct = (weight - lag(weight)) / lag(weight) * 100,
-     
-     change_per_hour = step_change_pct / delta_time_h,
-     
-     interval = paste0(prev_time, " → ", time)  
+ plot_change_bar <- bodyweight_step %>%
+   filter(
+     group == "CAS",
+     !is.na(step_change_pct)
    ) %>%
-   ungroup() %>%
-   filter(!is.na(delta_time_h), delta_time_h > 0)
-
- #Table
- rate_table <- analysis_rate %>%
-   select(
-     group,
-     number,
-     sex,
-     date,
-     interval,         
-     delta_time_h,
-     step_change_pct,
-     change_per_hour
+   mutate(
+     period = case_when(
+       time_h <= 11   ~ "morning",
+       time_h <= 17.5 ~ "afternoon",
+       time_h > 17.5  ~ "evening"
+     ),
+     period = factor(
+       period,
+       levels = c("morning", "afternoon", "evening")
+     ),
+     bar_id = interaction(number, date, drop = TRUE)
    )
  
- rate_table
-
- View(rate_table)
- write_csv(rate_table, "data/rate_table.csv")
-
- ## Control 
  
- control_rate <- plot_cas_control_use %>%
-   arrange(number, time_h) %>%
-   group_by(number) %>%
-   mutate(
-     prev_time_h = lag(time_h),
-     prev_time = lag(time),
-     prev_weight = lag(weight),
-     
-     delta_time_h = time_h - prev_time_h,
-     
-     step_change_g = weight - prev_weight,
-     step_change_pct = (weight - prev_weight) / prev_weight * 100,
-     change_per_hour = step_change_pct / delta_time_h,
-     
-     interval = paste0(prev_time, " → ", time)
-   ) %>%
-   ungroup() %>%
-   filter(!is.na(delta_time_h), delta_time_h > 0)
- 
- # Table
- control_rate_table <- control_rate %>%
-   select(
-     number,
-     sex,
-     interval,
-     delta_time_h,
-     prev_weight,
-     weight,
-     step_change_g,
-     step_change_pct,
-     change_per_hour
+ ## Mean and SE for each CAS time window
+ change_summary <- plot_change_bar %>%
+   group_by(period) %>%
+   summarise(
+     mean_change = mean(step_change_pct, na.rm = TRUE),
+     se_change = sd(step_change_pct, na.rm = TRUE) /
+       sqrt(sum(!is.na(step_change_pct))),
+     .groups = "drop"
    )
  
- control_rate_table
  
- View(control_rate_table)
- write_csv(control_rate_table, "data/control_rate_table.csv")
+ fig_cas_A <- ggplot(
+   plot_change_bar,
+   aes(
+     x = period,
+     y = step_change_pct,
+     fill = period
+   )
+ ) +
+   
+   ## One bar per individual
+   geom_col(
+     aes(group = bar_id),
+     position = position_dodge2(
+       width = 0.8,
+       preserve = "single",
+       padding = 0.08
+     ),
+     width = 0.75,
+     alpha = 0.75,
+     colour = "black",
+     linewidth = 0.2
+   ) +
+   
+   geom_hline(
+     yintercept = 0,
+     linetype = "dashed",
+     linewidth = 0.5
+   ) +
+   
+   ## Solid black mean and SE
+   geom_errorbar(
+     data = change_summary,
+     aes(
+       x = period,
+       ymin = mean_change - se_change,
+       ymax = mean_change + se_change
+     ),
+     inherit.aes = FALSE,
+     width = 0.10,
+     linewidth = 0.6,
+     colour = "black"
+   ) +
+   
+   geom_point(
+     data = change_summary,
+     aes(
+       x = period,
+       y = mean_change
+     ),
+     inherit.aes = FALSE,
+     shape = 16,
+     size = 2,
+     colour = "black"
+   ) +
+   
+   scale_fill_manual(
+     values = bg_cols,
+     drop = FALSE
+   ) +
+   
+   scale_x_discrete(
+     labels = c(
+       morning   = "08:00–11:00",
+       afternoon = "11:00–17:30",
+       evening   = "17:30–20:30"
+     )
+   ) +
+   
+   scale_y_continuous(
+     labels = function(x) paste0(sprintf("%.1f", x), "%"),
+     expand = expansion(mult = c(0.08, 0.12))
+   ) +
+   
+   labs(
+     title = "A",
+     x = "Time window",
+     y = "Stepwise body mass change (%)"
+   ) +
+   
+   theme_classic() +
+   
+   theme(
+     legend.position = "none",
+     plot.title = element_text(
+       face = "bold",
+       size = 14,
+       hjust = 0
+     ),
+     plot.margin = margin(5.5, 5.5, 3, 5.5)
+   )
+ 
+ 
 
- ## Stats for cas 
+ cas_control_use <- cas_control %>%
+   filter(sex == "female")
  
- cas_rate_summary <- analysis_rate %>%
-   filter(group == "CAS") %>%
+ control_change <- cas_control_use %>%
+   filter(
+     action %in% c("lab", "bodyweight"),
+     !is.na(weight)
+   ) %>%
+   arrange(number, event) %>%
+   group_by(number, species, sex) %>%
+   summarise(
+     weight_start = first(weight),
+     weight_end   = last(weight),
+     .groups = "drop"
+   ) %>%
+   mutate(
+     body_mass_change_pct =
+       (weight_end - weight_start) / weight_start * 100,
+     
+     ## Control data exist only for the first interval
+     period = factor(
+       "morning",
+       levels = c("morning", "afternoon", "evening")
+     ),
+     
+     bar_id = row_number()
+   )
+ 
+ 
+ ## Mean and SE
+ control_summary <- control_change %>%
+   summarise(
+     period = factor(
+       "morning",
+       levels = c("morning", "afternoon", "evening")
+     ),
+     mean_change = mean(body_mass_change_pct, na.rm = TRUE),
+     se_change = sd(body_mass_change_pct, na.rm = TRUE) /
+       sqrt(sum(!is.na(body_mass_change_pct)))
+   )
+ 
+ 
+ fig_control_B <- ggplot(
+   control_change,
+   aes(
+     x = period,
+     y = body_mass_change_pct
+   )
+ ) +
+   
+   ## One bar per control individual
+   geom_col(
+     aes(group = bar_id),
+     position = position_dodge2(
+       width = 0.8,
+       preserve = "single",
+       padding = 0.08
+     ),
+     width = 0.75,
+     fill = bg_cols["morning"],
+     alpha = 0.75,
+     colour = "black",
+     linewidth = 0.2
+   ) +
+   
+   geom_hline(
+     yintercept = 0,
+     linetype = "dashed",
+     linewidth = 0.5
+   ) +
+   
+   ## Mean ± SE
+   geom_errorbar(
+     data = control_summary,
+     aes(
+       x = period,
+       ymin = mean_change - se_change,
+       ymax = mean_change + se_change
+     ),
+     inherit.aes = FALSE,
+     width = 0.10,
+     linewidth = 0.6,
+     colour = "black"
+   ) +
+   
+   geom_point(
+     data = control_summary,
+     aes(
+       x = period,
+       y = mean_change
+     ),
+     inherit.aes = FALSE,
+     shape = 16,
+     size = 2,
+     colour = "black"
+   ) +
+   
+   ## Keep all three time windows, including empty categories
+   scale_x_discrete(
+     limits = c("morning", "afternoon", "evening"),
+     labels = c(
+       morning   = "09:00–12:00",
+       afternoon = "12:00–17:30",
+       evening   = "17:30–20:30"
+     ),
+     drop = FALSE
+   ) +
+   
+   scale_y_continuous(
+     labels = function(x) paste0(sprintf("%.1f", x), "%"),
+     expand = expansion(mult = c(0.08, 0.12))
+   ) +
+   
+   labs(
+     title = "B",
+     x = "Time window",
+     y = "Body mass change (%)"
+   ) +
+   
+   theme_classic() +
+   
+   theme(
+     plot.title = element_text(
+       face = "bold",
+       size = 14,
+       hjust = 0
+     ),
+     plot.margin = margin(3, 5.5, 5.5, 5.5)
+   )
+ 
+ 
+ ## Combine with the already-created Graph A
+ fig_cas_control_bars <- fig_cas_A / fig_control_B +
+   plot_layout(heights = c(1, 1))
+ 
+ fig_cas_control_bars
+
+#### pathcwork ABC - bodymass, splitwise, body mass change ####
+ library(ggplot2)
+ library(patchwork)
+ library(grid)
+ 
+##Panel A
+ fig_weight_time_A <- fig_weight_time +
+   labs(
+     title = "A)",
+     x = "Time of day",
+     y = NULL
+   ) +
+   guides(
+     shape = guide_legend(
+       title = "Sex",
+       direction = "horizontal",
+       title.position = "left"
+     )
+   ) +
+   theme(
+     plot.title = element_text(
+       face = "bold",
+       size = 14,
+       hjust = 0
+     ),
+     
+     ## Legend above the plotting area, aligned toward the left
+     legend.position = "top",
+     legend.justification = "left",
+     legend.direction = "horizontal",
+     legend.box = "horizontal",
+     legend.title = element_text(size = 9),
+     legend.text = element_text(size = 9),
+     legend.key.width = unit(0.4, "cm"),
+     legend.key.height = unit(0.35, "cm"),
+     legend.margin = margin(0, 0, -5, 28),
+     
+     plot.margin = margin(3, 5.5, 3, 2)
+   )
+ 
+## Panel B 
+ 
+ fig_cas_B <- fig_cas_A +
+   scale_x_discrete(
+     limits = c("morning", "afternoon", "evening"),
+     labels = c(
+       morning   = "08:00–11:00",
+       afternoon = "11:00–17:30",
+       evening   = "17:30–20:30"
+     ),
+     drop = FALSE
+   ) +
+   labs(
+     title = "B)",
+     x = "Time window",
+     y = NULL
+   ) +
+   theme(
+     plot.title = element_text(
+       face = "bold",
+       size = 14,
+       hjust = 0
+     ),
+     axis.text.x = element_text(),
+     axis.ticks.x = element_line(),
+     plot.margin = margin(3, 5.5, 5.5, 2)
+   )
+ 
+ 
+ ## ============================================================
+ ## Panel C: control body-mass change
+ ## ============================================================
+ 
+ fig_control_C <- fig_control_B +
+   scale_x_discrete(
+     limits = c("morning", "afternoon", "evening"),
+     labels = c(
+       morning   = "09:00–12:00",
+       afternoon = "12:00–17:30",
+       evening   = "17:30–20:30"
+     ),
+     drop = FALSE
+   ) +
+   labs(
+     title = "C)",
+     x = "Time window (Control)",
+     y = NULL
+   ) +
+   theme(
+     plot.title = element_text(
+       face = "bold",
+       size = 14,
+       hjust = 0
+     ),
+     plot.margin = margin(3, 5.5, 5.5, 2)
+   )
+ 
+ 
+ ## ============================================================
+ ## Shared y-axis titles
+ ## ============================================================
+ 
+ y_title_A <- wrap_elements(
+   full = textGrob(
+     "Body mass (g)",
+     rot = 90,
+     gp = gpar(fontsize = 11)
+   )
+ )
+ 
+ y_title_BC <- wrap_elements(
+   full = textGrob(
+     "Body mass change (%)",
+     rot = 90,
+     gp = gpar(fontsize = 11)
+   )
+ )
+ 
+ 
+ ## ============================================================
+ ## Build aligned blocks
+ ## ============================================================
+ 
+ fig_A_block <- y_title_A + fig_weight_time_A +
+   plot_layout(widths = c(0.06, 1))
+ 
+ fig_BC_plots <- fig_cas_B / fig_control_C +
+   plot_layout(
+     heights = c(1, 1)
+   )
+ 
+ fig_BC_block <- y_title_BC + fig_BC_plots +
+   plot_layout(widths = c(0.06, 1))
+ 
+ 
+ ## ============================================================
+ ## Final combined figure
+ ## ============================================================
+ 
+ fig_body_mass_combined <- fig_A_block / fig_BC_block +
+   plot_layout(
+     heights = c(1.1, 2.15)
+   )
+ 
+ fig_body_mass_combined
+ 
+#### Analysis####
+ 
+ library(lme4)
+ library(lmerTest)
+ library(emmeans)
+
+ #1.body mass difer from 0
+ ## One-sample Wilcoxon tests against zero
+ wilcox.test(
+   plot_change_bar$step_change_pct[plot_change_bar$period == "morning"],
+   mu = 0
+ )
+ 
+ wilcox.test(
+   plot_change_bar$step_change_pct[plot_change_bar$period == "afternoon"],
+   mu = 0
+ )
+ 
+ wilcox.test(
+   plot_change_bar$step_change_pct[plot_change_bar$period == "evening"],
+   mu = 0
+ )
+ 
+ #2. body mass differ during the time windows (A)
+ model_bw <- lmer(
+   step_change_pct ~ period + (1 | number),
+   data = plot_change_bar
+ )
+ 
+ anova(model_bw)
+ 
+# highly significant effect of time window 
+# F(2, 51) = 45.31
+# P < 0.0001
+ 
+ # Pairwise comparisons
+ emmeans(model_bw, pairwise ~ period, adjust = "tukey")
+ 
+# checking hich intervalls are significantly differentto each other: 
+# $contrasts
+#contrast               estimate   SE  df t.ratio  p.value
+ #morning - afternoon    18.84   1.99  34   9.451  <.0001
+ #morning - evening      11.39   1.99  34   5.712  <.0001
+ #afternoon - evening    -7.45   1.99  34  -3.739  0.0019 
+ 
+ 
+#2. Means of the figure 
+ plot_change_bar %>%
+   group_by(period) %>%
    summarise(
      n = n(),
-     mean_rate = mean(change_per_hour, na.rm = TRUE),
-     sd_rate = sd(change_per_hour, na.rm = TRUE),
-     min_rate = min(change_per_hour, na.rm = TRUE),
-     max_rate = max(change_per_hour, na.rm = TRUE)
+     mean = mean(step_change_pct),
+     sd = sd(step_change_pct),
+     se = sd/sqrt(n())
+   )
+
+#period        n  mean    sd    se
+#<fct>     <int> <dbl> <dbl> <dbl>
+#1 morning      18 13.7   7.28  1.71
+#2 afternoon    18 -5.16  4.87  1.15
+#3 evening      18  2.29  5.54  1.30 
+ 
+# 3. comapring control with afternoon
+# -> including the difference in time length
+ cas_afternoon <- plot_change_bar %>%
+   filter(period == "afternoon") %>%
+   mutate(
+     hours = 7.5,
+     change_per_hour = step_change_pct / hours
+   ) %>%
+   transmute(
+     group = "Afternoon",
+     change_per_hour
    )
  
-cas_rate_summary
-# PER HOUR
-#n mean_rate sd_rate min_rate max_rate
-#<int>     <dbl>   <dbl>    <dbl>    <dbl>
-#   1    54      1.51    2.88    -2.16     9.89
+# Control (% per hour)
+ control_hour <- control_change %>%
+   mutate(
+     hours = 3,
+     change_per_hour = body_mass_change_pct / hours
+   ) %>%
+   transmute(
+     group = "Control",
+     change_per_hour
+   )
+ 
+# Combine
+ comparison <- bind_rows(
+   cas_afternoon,
+   control_hour
+ )
+ 
+# Means
+ comparison %>%
+   group_by(group) %>%
+   summarise(
+     n = n(),
+     mean = mean(change_per_hour),
+     sd = sd(change_per_hour),
+     se = sd/sqrt(n())
+   )
+ 
+# group         n    mean    sd     se
+# <chr>       <int>  <dbl>   <dbl>  <dbl>
+#1 Afternoon    18   -0.688  0.649  0.153
+#2 Control       6   -0.902  0.391  0.160
 
-wilcox.test(
-  analysis_rate$change_per_hour[analysis_rate$group == "CAS"],
-  mu = 0
-)
+#> Cas loses 0.69% per hour 
+#> Control loses 0.90% per hour 
 
-#Wilcoxon signed rank test with continuity correction
+# Statistical comparison
+ t.test(change_per_hour ~ group,
+        data = comparison)
 
-#data:  analysis_rate$change_per_hour[analysis_rate$group == "CAS"]
-#V = 1062, p-value = 0.006021
-#alternative hypothesis: true location is not equal to 0
-# _> there is a sistematic weight change per hour 
-
-cas_gain_loss <- analysis_rate %>%
-  filter(group == "CAS") %>%
-  mutate(
-    direction = ifelse(change_per_hour > 0, "gain", "loss")
-  ) %>%
-  group_by(direction) %>%
-  summarise(
-    mean_rate = mean(change_per_hour, na.rm = TRUE),
-    n = n()
-  )
-
-cas_gain_loss 
-#direction mean_rate     n
-#<chr>         <dbl>   <int>
-#1 gain          3.64     29
-#2 loss         -0.961    25
-# -> more gain than loss 
-
-model_time_simple <- lm(
-  change_per_hour ~ interval,
-  data = analysis_rate %>% filter(group == "CAS")
-)
-
-anova(model_time_simple)
-
-#Analysis of Variance Table
-
-#Response: change_per_hour
-#Df Sum Sq Mean Sq F value    Pr(>F)    
-#interval   2 272.98 136.489  41.576 1.947e-11 ***
-#Residuals 51 167.43   3.283                      
----
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# -> it differs 
-  
-  model_time_aov <- aov(
-    change_per_hour ~ interval,
-    data = analysis_rate %>% filter(group == "CAS")
-  )
-
-TukeyHSD(model_time_aov)
-# -> all time windows are significantly different to each other 
+#> p-value of 0.349 shows no significance
+#> 
