@@ -157,7 +157,7 @@ fig_species_by_time <- ggplot(
 
 fig_species_by_time
 
-#-> mo significance in any time winodws for species 
+#-> no significance in any time winodws for species 
 #  Needs exact testing 
 
 
@@ -1724,9 +1724,9 @@ make_bw_time_plot <- function(data, panel_label,
     
     labs(
       title = panel_label,
-      x = ifelse(show_x_title, "Time window", NULL),
-      y = ifelse(show_y, "Mass-specific total input rate ((g/hr)/body mass)", NULL)
-    ) +
+      x = if (show_x_title) "Time window" else NULL,
+      y = if (show_y) "Mass-specific total input rate ((g/hr)/body mass)" else NULL
+     ) +
     
     theme_classic() +
     theme(
@@ -1842,3 +1842,4 @@ anova(model_species)
 input_hr_bw ~ species * time_window
 model_interaction <- lm(input_hr_bw ~ species * time_window, data = plot_data_pos_bw)
 anova(model_interaction)
+

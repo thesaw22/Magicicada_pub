@@ -1,0 +1,7 @@
+.y.,group1,group2,n1,n2,statistic,p,p.adj,p.adj.signif
+input_per_body_mass_h,Morning,Afternoon,13,4,47,0.015,0.045,*
+input_per_body_mass_h,Morning,Evening,13,6,47,0.521,0.625,ns
+input_per_body_mass_h,Morning,Night,13,6,73,0.001,0.008,**
+input_per_body_mass_h,Afternoon,Evening,4,6,3,0.067,0.1,ns
+input_per_body_mass_h,Afternoon,Night,4,6,13,0.914,0.914,ns
+input_per_body_mass_h,Evening,Night,6,6,32,0.026,0.052,ns
