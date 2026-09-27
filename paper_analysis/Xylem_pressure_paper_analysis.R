@@ -1,22 +1,24 @@
-# Xylem pressure and air temperature: manuscript figure
+# Xylem pressure and air temperature:  "Sucking to Survive? Adult 17-year periodical cicadas (Magicicada spp.) exhibit low rates of xylem ingestion"
 # Year: 2026
 # Script author: Theresa Weinspach
-# Manuscript authors: enter the final author list before sharing.
-# Purpose: reproduce the final two-panel temperature/pressure figure.
+# Manuscript authors: Theresa Weinspach, Leigh Boardman, and Phillip G. D. Matthews
+# Purpose: code of the two-panel temperature/pressure figure (Fig.1)
 # Run from the root of the CicTen RStudio Project.
 # Inputs: data/Pressure bomb .csv and data/Weather data.csv
 # Outputs: the figure and two hourly summary tables in output/.
 
-###-### Chapter 1: Packages and reproducibility ###-###
+#-# Chapter 1: Packages and reproducibility ####
 # Package versions are written to output/package_versions_xylem.txt.
 
-library(readr)
-library(dplyr)
-library(tidyr)
-library(stringr)
-library(lubridate)
-library(ggplot2)
-library(patchwork)
+#R == 4.3.1
+
+library(readr)      #2.1.4
+library(dplyr)      #1.1.4
+library(tidyr)      #1.3.1
+library(stringr)    #1.5.0
+library(lubridate)  #1.9.3
+library(ggplot2)    #3.5.2
+library(patchwork)  #1.2.0
 
 dir.create("output", showWarnings = FALSE, recursive = TRUE)
 
@@ -34,11 +36,12 @@ writeLines(
       sep = " == "
     )
   ),
-  "output/package_versions_xylem.txt"
+  "paper_analysis/output/package_versions_xylem.txt"
 )
 
-# Use a single artificial date for both 24-hour axes. The actual weather
-# dates are retained during filtering, then collapsed by hour of day.
+# Use a single artificial date for both 24-hour axes (A anb B). 
+# The actual weather dates are retained during filtering, then collapsed by hour of day.
+
 dummy_date <- "2000-01-01"
 next_date <- "2000-01-02"
 clock_time <- function(x, date = dummy_date) {
@@ -53,32 +56,37 @@ window_colors <- c(
 )
 
 #----------------------------
-###-### Chapter 2: Pressure data and hourly summary ###-###
+#-## Chapter 2: Pressure data and hourly summary ####
 
-# Read all columns as text before parsing numbers. The pressure-bomb sheet
-# holds replicate readings from Control, Liriope and Muhly. The paper figure
-# pools these groups at each clock time, as in the original plotting code.
-pressure_raw <- read_csv(
-  "data/Pressure bomb .csv",
-  col_types = cols(.default = col_character()),
+# pressure_tidy.csv is the saved long-format table from the original script.
+# Each row is one Control, Liriope, or Muhly reading. Pressure is ALREADY
+# negative in bar. Pools the readings at each clock time as in the paper figure.
+# One bar is 0.1 MPa; retain the sign during conversion.
+
+pressure_path <- if (file.exists("data/pressure_tidy.csv")) {
+  "data/pressure_tidy.csv"
+} else {
+  "paper_analysis/pressure_tidy.csv"
+}
+
+pressure_long <- read_csv(
+  pressure_path,
   show_col_types = FALSE
 ) %>%
-  rename_with(str_trim)
-
-pressure_long <- pressure_raw %>%
-  pivot_longer(-time, names_to = "sample", values_to = "reading") %>%
   transmute(
-    time = str_trim(time),
-    treatment = word(sample, 1),
-    pressure_bar = -abs(parse_number(reading))
+    time = as.character(time),
+    treatment = as.character(treatment),
+    pressure_bar = as.numeric(pressure)
   ) %>%
   filter(!is.na(time), !is.na(pressure_bar))
 
-# Values in the source sheet are pressure magnitudes in bar. The original
-# analysis assigned a negative sign to express xylem tension. One bar is
-# 0.1 MPa, so negative values are retained during conversion.
+if (any(pressure_long$pressure_bar > 0)) {
+  stop("The pressure_tidy.csv input must contain negative values in bar.")
+}
+
 # The plotted bars show the MINIMUM and MAXIMUM individual reading at each
 # clock time; they are neither standard errors nor confidence intervals.
+
 pressure_hourly <- pressure_long %>%
   group_by(time) %>%
   summarise(
@@ -92,18 +100,20 @@ pressure_hourly <- pressure_long %>%
   arrange(clock)
 
 if (!nrow(pressure_hourly) || anyNA(pressure_hourly$clock)) {
-  stop("Check time and pressure fields in data/Pressure bomb .csv.")
+  stop("Check time and pressure fields in pressure_tidy.csv.")
 }
 
-write_csv(pressure_hourly, "output/xylem_pressure_hourly_mpa.csv")
+write_csv(pressure_hourly, "paper_analysis/output/xylemPressure.csv")
 
 #----------------------------
-###-### Chapter 3: Weather data and hourly summary ###-###
+#-### Chapter 3: Weather data and hourly summary ####
 
-# The source station reports degrees Fahrenheit. Only May 20-22, 2025 are
-# used here. Each clock hour pools observations from those three dates;
-# the min/max bars show the range of those observations. Consequently the
-# plot describes a mean daily pattern, not one continuous 24-hour record.
+# The source station reports degrees Fahrenheit.-> Celcius
+# Only May 20-22, 2025 are used here (days of fieldwork)
+# Each clock hour pools observations from those three dates;
+# the min/max bars show the range of those observations.
+# Consequently the plot describes a mean daily pattern, not one continuous 24-hour record.
+
 weather_raw <- read_delim(
   "data/Weather data.csv",
   delim = ";",
@@ -144,14 +154,15 @@ if (!nrow(temperature_hourly) || anyNA(temperature_hourly$clock)) {
   stop("Check timestamp and temperature fields in data/Weather data.csv.")
 }
 
-write_csv(temperature_hourly, "output/temperature_hourly_c.csv")
+write_csv(temperature_hourly, "paper_analysis/output/temperature_hourly_c.csv")
 
 #----------------------------
-###-### Chapter 4: Sampling-window bands ###-###
+#-#### Chapter 4: Sampling-window bands ####
 
-# These bands show when the cicadas were sampled. They are annotations,
-# not time periods inferred from the pressure or temperature measurements.
-# Dec/Dem windows span the full day; Cas windows follow the original figure.
+# Bands show when the cicadas were sampled. 
+# Annotations,not time periods inferred from the pressure or temperature measurements.
+# Dec/Dem windows span the full day; Cas windows follow the figure.
+
 dec_dem_windows <- data.frame(
   time_window = c("Night", "Morning", "Afternoon", "Evening", "Night"),
   xmin = c(
@@ -178,7 +189,7 @@ sampling_windows <- bind_rows(dec_dem_windows, cas_windows) %>%
       time_window, levels = c("Morning", "Afternoon", "Evening", "Night")
     ),
     label = if_else(species_group == "Cas" & time_window == "Evening",
-                    "Eve", as.character(time_window)),
+                    "Eve", as.character(time_window)), #Evening is too long for the bar 
     ymin = if_else(species_group == "Dec + Dem", -2.05, -1.83),
     ymax = if_else(species_group == "Dec + Dem", -1.85, -1.68),
     y_label = (ymin + ymax) / 2,
@@ -186,7 +197,7 @@ sampling_windows <- bind_rows(dec_dem_windows, cas_windows) %>%
   )
 
 #----------------------------
-###-### Chapter 5: Final two-panel figure ###-###
+#-##### Chapter 5: Final two-panel figure ####
 
 temperature_panel <- ggplot(temperature_hourly, aes(x = clock)) +
   geom_line(aes(y = mean_c), linewidth = 1, color = "black") +
@@ -263,7 +274,7 @@ combined_temp_xylem <- temperature_panel / pressure_panel +
 
 print(combined_temp_xylem)
 ggsave(
-  "output/Figure_temperature_xylem_AB.png",
+  "paper_analysis/Plots/Figure_temperature_xylem_AB.png",
   combined_temp_xylem, width = 9, height = 8, dpi = 300
 )
 
