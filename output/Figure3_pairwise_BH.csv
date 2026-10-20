@@ -1,0 +1,7 @@
+.y.,group1,group2,n1,n2,statistic,p,p.adj,p.adj.signif
+input_g_hr,Morning,Afternoon,24,6,130,0.003,0.016,*
+input_g_hr,Morning,Evening,24,11,127,0.873,1,ns
+input_g_hr,Morning,Night,24,10,200,0.003,0.016,*
+input_g_hr,Afternoon,Evening,6,11,6,0.005,0.019,*
+input_g_hr,Afternoon,Night,6,10,31.5,0.914,1,ns
+input_g_hr,Evening,Night,11,10,91,0.01,0.03,*

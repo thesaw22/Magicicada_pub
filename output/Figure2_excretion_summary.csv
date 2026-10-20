@@ -1,0 +1,5 @@
+time_window,n,excreting,probability_pct
+Morning,25,21,84
+Afternoon,6,6,100
+Evening,15,9,60
+Night,12,6,50
