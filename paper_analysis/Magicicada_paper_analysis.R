@@ -250,7 +250,7 @@ fig1 <- panel_temp / panel_pressure + plot_annotation(tag_levels = "A", tag_suff
 save_plot(fig1, "Figure1_temperature_xylem_AB.png", 9, 8)
 
 #----------------------------
-#-##### Chapter 5: Figure 2, excretion probability ####
+#-##### Chapter 5: Figure 2, excretion proportion ####
 
 # The exclusions follow the Dec/Dem analysis 
 # (death in the field or lost pipette tip). 
@@ -298,9 +298,9 @@ fig2 <- ggplot(excretion_summary, aes(time_window, probability_pct, fill = time_
   scale_fill_manual(values = window_fill) +
   scale_y_continuous(breaks = seq(0, 100, 20)) +
   coord_cartesian(ylim = c(0, 110)) +
-  labs(x = "Time window", y = "Excretion probability (%)") +
+  labs(x = "Time window", y = "Excretion proportion (%)") +
   theme_classic() + theme(legend.position = "none")
-save_plot(fig2, "Figure2_excretion_probability.png", 7, 5)
+save_plot(fig2, "Figure2_excretion_proportion.png", 7, 5)
 
 
 
